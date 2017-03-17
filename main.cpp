@@ -20,6 +20,18 @@ extern "C" void dsaupd_(int *ido,
                        int *lworkl,
                        int *info);
 
+extern "C" void dgemv_(char *trans,
+                       int *M,
+                       int *N,
+                       double *alpha,
+                       double *A,
+                       int *lda,
+                       double *X,
+                       int *incx,
+                       double *beta,
+                       double *Y,
+                       int *incy);
+
 int main(char *argc, char **argv)
 {
   Eigen::Tensor<double, 2, Eigen::ColMajor> A(2, 2);
@@ -47,9 +59,14 @@ int main(char *argc, char **argv)
 
   dsaupd_(&ido, "I", &N, "SM", &nev, &tol, resid.data(), &ncv, v.data(), &ldv, iparam.data(), ipntr.data(), workd.data(), workl.data(), &lworkl, &info);
 
-  auto t = A * A;
+  double alpha = 1.0;
+  double beta = 0.0;
+  int one = 1;
 
-  printf("%f", t(0, 0));
+  printf("ido: %d", ido);
+  printf("%d %d\n", ipntr[0], ipntr[1]);
+  
+  dgemv_("N", &N, &N, &alpha, A.data(), &N, workd.data() + ipntr[0] - 1, &one, &beta, workd.data() + ipntr[1] - 1, &one);
   
   //workd.data()[ipntr[0] - 1], workd.data()[iptr[1] - 1];
 }
