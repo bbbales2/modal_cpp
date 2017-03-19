@@ -1,4 +1,6 @@
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
+#include <eigen3/Eigen/LU>
+#include <eigen3/Eigen/Core>
 #include <stdio.h>
 
 #include "polybasis.hpp"
@@ -32,43 +34,119 @@ extern "C" void dgemv_(char *trans,
                        double *Y,
                        int *incy);
 
+extern "C" void dseupd_(int *rvec,
+                        char *howmany,
+                        int *select,
+                        double *D,
+                        double *Z,
+                        int *ldz,
+                        double *sigma,
+                        char *bmat,
+                        int *N,
+                        char *which,
+                        int *nev,
+                        double *tol,
+                        double *resid,
+                        int *nvc,
+                        double *v,
+                        int *ldv,
+                        int *IPARAM,
+                        int *IPNTR,
+                        double *workd,
+                        double *workl,
+                        int *lworkl,
+                        int *info);
+
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
+
 int main(char *argc, char **argv)
 {
-  Eigen::Tensor<double, 2, Eigen::ColMajor> A(2, 2);
+  int N = 20;
 
-  A.setValues({{1.0, 2.0},
-               {2.0, 4.0}});
+  MatrixXd A(N, N);
+  auto LUA = A.lu();
+  
+  //Eigen::Tensor<double, 2, Eigen::ColMajor> &A = *new Eigen::Tensor<double, 2, Eigen::ColMajor>(N, N);
 
+  A.setRandom();
+
+  for(int i = 0; i < N; i++) {
+    for(int j = i; j < N; j++) {
+      A(j, i) = A(i, j);
+    }
+  }
+  
   int ido = 0;
-  int N = 2;
-  int nev = 2;
-  double tol = 1e-5;
-  Eigen::Tensor<double, 1> resid(N);
-  int ncv = 2;
-  Eigen::Tensor<double, 2, Eigen::ColMajor> v(N, ncv);
-  int ldv = 2;
-  Eigen::Tensor<int, 1> iparam(11);
-  iparam(0) = 0;
-  iparam(2) = 100;
-  iparam(6) = 1;
-  Eigen::Tensor<int, 1> ipntr(11);
-  Eigen::Tensor<double, 1> workd(3 * N);
+  int nev = 5;
+  double tol = -1e-5;
+  std::vector<double> resid(N);
+  int ncv = 20;
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> v(N, ncv);
+  int ldv = N;
+  int iparam[11];
+  iparam[0] = 1;
+  iparam[2] = 1000;
+  iparam[3] = 1;
+  iparam[6] = 1;
+  int ipntr[11];
+  std::vector<double> workd(3 * N);
   int lworkl = ncv * ncv + 8 * ncv;
-  Eigen::Tensor<double, 1> workl(lworkl);
+  std::vector<double> workl(lworkl);
+
   int info = 0;
 
-  dsaupd_(&ido, "I", &N, "SM", &nev, &tol, resid.data(), &ncv, v.data(), &ldv, iparam.data(), ipntr.data(), workd.data(), workl.data(), &lworkl, &info);
+  while(true) {
+    dsaupd_(&ido, "I", &N, "SM", &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
+    
+    //printf("ido: %d\n", ido);
+    //printf("%d %d\n", ipntr[0], ipntr[1]);
+    //printf("info: %d\n", info);
 
-  double alpha = 1.0;
-  double beta = 0.0;
-  int one = 1;
+    if(ido == 1 || ido == -1) {
+      double alpha = 1.0;
+      double beta = 0.0;
+      int one = 1;
 
-  printf("ido: %d", ido);
-  printf("%d %d\n", ipntr[0], ipntr[1]);
+      Eigen::Map<Eigen::MatrixXd> x(&workd[ipntr[0] - 1], N, 1),
+        y(&workd[ipntr[1] - 1], N, 1);
+      
+      y = A * x;
+      
+      //dgemv_("N", &N, &N, &alpha, A.data(), &N, &workd[ipntr[0] - 1], &one, &beta, &workd[ipntr[1] - 1], &one);
+    } else if(ido == 99) {
+      break;
+    } else {
+      printf("ido = %d\n", ido);
+      return -1;
+    }
+  }
+
+  int rvec = 1;
+  int select[nev];
+  for(int i = 0; i < nev; i++)
+    select[nev] = 1;
+  std::vector<double> D(nev);
+  Eigen::Tensor<double, 2, Eigen::ColMajor> &Z = *new Eigen::Tensor<double, 2, Eigen::ColMajor>(N, nev);
+  int ldz = N;
+  double sigma = 0.0;
   
-  dgemv_("N", &N, &N, &alpha, A.data(), &N, workd.data() + ipntr[0] - 1, &one, &beta, workd.data() + ipntr[1] - 1, &one);
+  dseupd_(&rvec, "A", select, &D[0], Z.data(), &ldz, &sigma,
+          "I", &N, "SM", &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
+
+  printf("Info %d\n", info);
   
-  //workd.data()[ipntr[0] - 1], workd.data()[iptr[1] - 1];
+  printf("Eigenvalues:\n");
+  for(int i = 0; i < nev; i++) {
+    printf("%f\n", D[i]);
+  }
+
+  /*printf("\nEigenvectors:\n");
+  for(int i = 0; i < N; i++) {
+    for(int j = 0; j < nev; j++) {
+      printf("%f ", Z(i, j));
+    }
+    printf("\n");
+    }*/
 }
 
 int main2(char *argc, char **argv)
