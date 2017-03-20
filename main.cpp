@@ -1,3 +1,5 @@
+#define EIGEN_USE_BLAS
+
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/LU>
@@ -23,7 +25,7 @@ extern "C" void dsaupd_(int *ido,
                        int *lworkl,
                        int *info);
 
-extern "C" void dgemv_(char *trans,
+/*extern "C" void dgemv_(char *trans,
                        int *M,
                        int *N,
                        double *alpha,
@@ -33,7 +35,7 @@ extern "C" void dgemv_(char *trans,
                        int *incx,
                        double *beta,
                        double *Y,
-                       int *incy);
+                       int *incy);*/
 
 extern "C" void dseupd_(int *rvec,
                         const char *howmany,
@@ -58,14 +60,15 @@ extern "C" void dseupd_(int *rvec,
                         int *lworkl,
                         int *info);
 
-MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int nev, double sigma_ = 0.01)
+MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int nev, double sigma_ = 0.5)
 {
   double sigma = sigma_; // I have to reassign sigma from arguments to local variable otherwise the output doesn't get shifted right. Not sure what's happening.
 
   int N = A.rows();
   
   bool si = true;
-  const char *weigs = "LA";
+  const char *weigs = (si) ? "LA" : "SA";
+  const char *type = (si) ? "G" : "I";
 
   auto Ashift = A;
 
@@ -73,12 +76,16 @@ MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int nev, double sigma_ = 0.01)
     for(int j = 0; j < A.cols(); j++)
       Ashift(i, j) -= sigma * B(i, j);
 
-  auto LUAshift = Ashift.ldlt();
+  auto LL = B.llt();
+  MatrixXd L = LL.matrixL();
+  auto LT = L.transpose().eval();
+
+  auto op = (si) ? Ashift.ldlt() : B.ldlt();
   
   int ido = 0;
   double tol = 1e-5;
   std::vector<double> resid(N);
-  int ncv = nev + 10;
+  int ncv = std::min(nev + 10, N - 1);
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> v(N, ncv);
   int ldv = N;
   int iparam[11];
@@ -100,33 +107,52 @@ MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int nev, double sigma_ = 0.01)
   int info = 0;
 
   double tmp = omp_get_wtime();
+
+  double t1 = 0.0, t2 = 0.0, t3 = 0.0, t4 = 0.0, t5 = 0.0, t;
+  
   while(true) {
-    dsaupd_(&ido, "G", &N, weigs, &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
+    t = omp_get_wtime();
+    dsaupd_(&ido, type, &N, weigs, &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
+    t1 += omp_get_wtime() - t;
     
     //printf("ido: %d\n", ido);
     //printf("%d %d\n", ipntr[0], ipntr[1]);
     //printf("info: %d\n", info);
 
+    if(info != 0) {
+      printf("error %d\n", info);
+      exit(-1);
+    }
+    
+    t = omp_get_wtime();
     Eigen::Map<Eigen::MatrixXd> x(&workd[ipntr[0] - 1], N, 1),
       y(&workd[ipntr[1] - 1], N, 1);
+    t2 += omp_get_wtime() - t;
  
     if(ido == -1) {
+      t = omp_get_wtime();
       if(si) {
-        y = LUAshift.solve(B * x);
-        printf("test\n");
+        y = op.solve(B * x);
       } else {
-        y = A * x;
+        y = L.triangularView<Eigen::Lower>().solve(A * LT.triangularView<Eigen::Upper>().solve(x));
       }
+      t3 += omp_get_wtime() - t;
     } else if(ido == 1) {
+      t = omp_get_wtime();
       Eigen::Map<Eigen::MatrixXd> z(&workd[ipntr[2] - 1], N, 1);
-      
+      t2 += omp_get_wtime() - t;
+
+      t = omp_get_wtime();
       if(si) {
-        y = LUAshift.solve(z);
+        y = op.solve(z);
       } else {
-        y = A * z;
+        y = L.triangularView<Eigen::Lower>().solve(A * LT.triangularView<Eigen::Upper>().solve(x));
       }
+      t4 += omp_get_wtime() - t;
     } else if(ido == 2) {
+      t = omp_get_wtime();
       y = B * x;
+      t5 += omp_get_wtime() - t;
     } else if(ido == 99) {
       break;
     } else {
@@ -135,6 +161,8 @@ MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int nev, double sigma_ = 0.01)
     }
   }
 
+  printf("dsaupd_ %f\nalloc %f\n-1 %f\n1 %f\n2 %f\n", t1, t2, t3, t4, t5);
+  
   int rvec = 1;
   int select[nev];
   for(int i = 0; i < nev; i++)
@@ -145,7 +173,10 @@ MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int nev, double sigma_ = 0.01)
   int ldz = N;
   
   dseupd_(&rvec, "A", select, D.data(), Z.data(), &ldz, &sigma,
-          "G", &N, weigs, &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
+          type, &N, weigs, &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
+
+  if(!si)
+    Z = LT.triangularView<Eigen::Upper>().solve<Eigen::OnTheLeft>(Z);
 
   printf("Info %d, %f\n", info, omp_get_wtime() - tmp);
   
@@ -153,7 +184,7 @@ MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int nev, double sigma_ = 0.01)
 }
 
 int main2(int argc, char **argv) {
-  int N = 1000;
+  int N = 10;
 
   MatrixXd A(N, N);
   MatrixXd B(N, N);
@@ -174,7 +205,7 @@ int main2(int argc, char **argv) {
   for(int i = 0; i < N; i++) {
     for(int j = 0; j < N; j++) {
       if(i == j) {
-        A(i, j) = i;
+        A(i, j) = i + 1.0;
         B(i, j) = 2.00;
         printf("%d %d %f %f\n", i, j, B(i, j), A(i, j));
       }
@@ -182,7 +213,7 @@ int main2(int argc, char **argv) {
   }
 
   double tmp = omp_get_wtime();
-  MatrixXd eigs = eigsD(A, B, 2);
+  MatrixXd eigs = eigsD(A, B, 5);
   printf("Time %f\n", omp_get_wtime() - tmp);
   
   printf("Eigenvalues:\n");
@@ -233,8 +264,15 @@ int main(int argc, char **argv)
   
   buildKM(C, *dp, *pv, density, &K, &M);
 
+  for(int i = 0; i < M->rows(); i++) {
+    for(int j = 0; j < M->cols(); j++) {
+      (*K)(i, j) /= 1e-6;
+      (*M)(i, j) /= 1e-6;
+    }
+  }
+
   double tmp = omp_get_wtime();
-  MatrixXd eigs = eigsD(*K, *M, 30);
+  MatrixXd eigs = eigsD(*K, *M, 53);
   printf("Time %f\n", omp_get_wtime() - tmp);
 
   /*M->setZero();
