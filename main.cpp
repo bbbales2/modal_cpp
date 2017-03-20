@@ -1,14 +1,15 @@
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
-#include <eigen3/Eigen/LU>
 #include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/LU>
+#include <eigen3/Eigen/Dense>
 #include <stdio.h>
 
 #include "polybasis.hpp"
 
 extern "C" void dsaupd_(int *ido,
-                       char *bmat,
+                       const char *bmat,
                        int *N,
-                       char *which,
+                       const char *which,
                        int *nev,
                        double *tol,
                        double *resid,
@@ -35,15 +36,15 @@ extern "C" void dgemv_(char *trans,
                        int *incy);
 
 extern "C" void dseupd_(int *rvec,
-                        char *howmany,
+                        const char *howmany,
                         int *select,
                         double *D,
                         double *Z,
                         int *ldz,
                         double *sigma,
-                        char *bmat,
+                        const char *bmat,
                         int *N,
-                        char *which,
+                        const char *which,
                         int *nev,
                         double *tol,
                         double *resid,
@@ -57,37 +58,40 @@ extern "C" void dseupd_(int *rvec,
                         int *lworkl,
                         int *info);
 
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
-
-int main(char *argc, char **argv)
+MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int nev, double sigma_ = 0.01)
 {
-  int N = 20;
+  double sigma = sigma_; // I have to reassign sigma from arguments to local variable otherwise the output doesn't get shifted right. Not sure what's happening.
 
-  MatrixXd A(N, N);
-  auto LUA = A.lu();
+  int N = A.rows();
   
-  //Eigen::Tensor<double, 2, Eigen::ColMajor> &A = *new Eigen::Tensor<double, 2, Eigen::ColMajor>(N, N);
+  bool si = true;
+  const char *weigs = "LA";
 
-  A.setRandom();
+  auto Ashift = A;
 
-  for(int i = 0; i < N; i++) {
-    for(int j = i; j < N; j++) {
-      A(j, i) = A(i, j);
-    }
-  }
+  for(int i = 0; i < A.rows(); i++)
+    for(int j = 0; j < A.cols(); j++)
+      Ashift(i, j) -= sigma * B(i, j);
+
+  auto LUAshift = Ashift.ldlt();
   
   int ido = 0;
-  int nev = 5;
-  double tol = -1e-5;
+  double tol = 1e-5;
   std::vector<double> resid(N);
-  int ncv = 20;
+  int ncv = nev + 10;
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> v(N, ncv);
   int ldv = N;
   int iparam[11];
-  iparam[0] = 1;
-  iparam[2] = 1000;
+    iparam[0] = 1;
+
+  iparam[2] = 10000;
   iparam[3] = 1;
-  iparam[6] = 1;
+
+  if(si)
+    iparam[6] = 3;
+  else
+    iparam[6] = 1;
+
   int ipntr[11];
   std::vector<double> workd(3 * N);
   int lworkl = ncv * ncv + 8 * ncv;
@@ -95,29 +99,39 @@ int main(char *argc, char **argv)
 
   int info = 0;
 
+  double tmp = omp_get_wtime();
   while(true) {
-    dsaupd_(&ido, "I", &N, "SM", &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
+    dsaupd_(&ido, "G", &N, weigs, &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
     
     //printf("ido: %d\n", ido);
     //printf("%d %d\n", ipntr[0], ipntr[1]);
     //printf("info: %d\n", info);
 
-    if(ido == 1 || ido == -1) {
-      double alpha = 1.0;
-      double beta = 0.0;
-      int one = 1;
-
-      Eigen::Map<Eigen::MatrixXd> x(&workd[ipntr[0] - 1], N, 1),
-        y(&workd[ipntr[1] - 1], N, 1);
+    Eigen::Map<Eigen::MatrixXd> x(&workd[ipntr[0] - 1], N, 1),
+      y(&workd[ipntr[1] - 1], N, 1);
+ 
+    if(ido == -1) {
+      if(si) {
+        y = LUAshift.solve(B * x);
+        printf("test\n");
+      } else {
+        y = A * x;
+      }
+    } else if(ido == 1) {
+      Eigen::Map<Eigen::MatrixXd> z(&workd[ipntr[2] - 1], N, 1);
       
-      y = A * x;
-      
-      //dgemv_("N", &N, &N, &alpha, A.data(), &N, &workd[ipntr[0] - 1], &one, &beta, &workd[ipntr[1] - 1], &one);
+      if(si) {
+        y = LUAshift.solve(z);
+      } else {
+        y = A * z;
+      }
+    } else if(ido == 2) {
+      y = B * x;
     } else if(ido == 99) {
       break;
     } else {
       printf("ido = %d\n", ido);
-      return -1;
+      exit(-1);
     }
   }
 
@@ -125,19 +139,58 @@ int main(char *argc, char **argv)
   int select[nev];
   for(int i = 0; i < nev; i++)
     select[nev] = 1;
-  std::vector<double> D(nev);
-  Eigen::Tensor<double, 2, Eigen::ColMajor> &Z = *new Eigen::Tensor<double, 2, Eigen::ColMajor>(N, nev);
-  int ldz = N;
-  double sigma = 0.0;
   
-  dseupd_(&rvec, "A", select, &D[0], Z.data(), &ldz, &sigma,
-          "I", &N, "SM", &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
+  MatrixXd D(nev, 1);
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> Z(N, nev);
+  int ldz = N;
+  
+  dseupd_(&rvec, "A", select, D.data(), Z.data(), &ldz, &sigma,
+          "G", &N, weigs, &nev, &tol, &resid[0], &ncv, v.data(), &ldv, iparam, ipntr, &workd[0], &workl[0], &lworkl, &info);
 
-  printf("Info %d\n", info);
+  printf("Info %d, %f\n", info, omp_get_wtime() - tmp);
+  
+  return D;
+}
+
+int main2(int argc, char **argv) {
+  int N = 1000;
+
+  MatrixXd A(N, N);
+  MatrixXd B(N, N);
+
+  //Eigen::Tensor<double, 2, Eigen::ColMajor> &A = *new Eigen::Tensor<double, 2, Eigen::ColMajor>(N, N);
+
+  //A.setRandom();
+
+  //for(int i = 0; i < N; i++) {
+  //  for(int j = i; j < N; j++) {
+  //    A(j, i) = A(i, j);
+  //  }
+  //}
+
+  A.setZero();
+  B.setZero();
+
+  for(int i = 0; i < N; i++) {
+    for(int j = 0; j < N; j++) {
+      if(i == j) {
+        A(i, j) = i;
+        B(i, j) = 2.00;
+        printf("%d %d %f %f\n", i, j, B(i, j), A(i, j));
+      }
+    }
+  }
+
+  double tmp = omp_get_wtime();
+  MatrixXd eigs = eigsD(A, B, 2);
+  printf("Time %f\n", omp_get_wtime() - tmp);
   
   printf("Eigenvalues:\n");
-  for(int i = 0; i < nev; i++) {
-    printf("%f\n", D[i]);
+  for(int i = 0; i < eigs.rows(); i++) {
+    for(int j = 0; j < eigs.cols(); j++) {
+      printf("%e ", eigs(i, j));
+    }
+    printf("\n");
   }
 
   /*printf("\nEigenvectors:\n");
@@ -149,7 +202,7 @@ int main(char *argc, char **argv)
     }*/
 }
 
-int main2(char *argc, char **argv)
+int main(int argc, char **argv)
 {
   double X = 0.007753,
     Y = 0.009057,
@@ -176,16 +229,38 @@ int main2(char *argc, char **argv)
                {0, 0, 0, 0, c44, 0},
                {0, 0, 0, 0, 0, c44}});
 
-  Eigen::Tensor<double, 2> *K, *M;
+  MatrixXd *K, *M;
   
   buildKM(C, *dp, *pv, density, &K, &M);
 
-  for(int i = 0; i < 10; i++) {
+  double tmp = omp_get_wtime();
+  MatrixXd eigs = eigsD(*K, *M, 30);
+  printf("Time %f\n", omp_get_wtime() - tmp);
+
+  /*M->setZero();
+
+  for(int i = 0; i < M->rows(); i++) {
+    for(int j = 0; j < M->cols(); j++) {
+      if(i == j) {
+        (*M)(i, j) = 1.0;
+      }
+    }
+    } */ 
+  
+  printf("Eigenvalues:\n");
+  for(int i = 0; i < eigs.rows(); i++) {
+    for(int j = 0; j < eigs.cols(); j++) {
+      printf("%e ", eigs(i, j));
+    }
+    printf("\n");
+  }
+
+  /*for(int i = 0; i < 10; i++) {
     for(int j = 0; j < 10; j++) {
       printf("%e ", (*K)(i, j));
     }
     printf("\n");
-  }
+    }*/
   
   return 0;
 }

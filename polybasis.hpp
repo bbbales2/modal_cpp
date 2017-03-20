@@ -1,5 +1,8 @@
 #include <cmath>
+#include <eigen3/Eigen/Core>
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
+
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
 
 double polyint(int n, int m, int l)
 {
@@ -199,7 +202,7 @@ import cython
 from cython cimport parallel
 */
 
-void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::Tensor<double, 2> &pv, double density, Eigen::Tensor<double, 2> **K_, Eigen::Tensor<double, 2> **M_) {
+void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::Tensor<double, 2> &pv, double density, MatrixXd **K_, MatrixXd **M_) {
   int N = dp.dimension(0);
 
   Eigen::Tensor<double, 4> C(3, 3, 3, 3);
@@ -286,7 +289,9 @@ void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::
   C(1, 0, 0, 1) = Ch(5, 5);
   C(1, 0, 1, 0) = Ch(5, 5);
 
-  Eigen::Tensor<double, 2> &K = *new Eigen::Tensor<double, 2>(N * 3, N * 3);
+  MatrixXd &K = *new MatrixXd(N * 3, N * 3);
+
+  K.setZero();
 
   for(int n = 0; n < N; n++)
     for(int m = 0; m < N; m++)
@@ -303,7 +308,9 @@ void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::
 
   *K_ = &K;
 
-  Eigen::Tensor<double, 2> &M = *new Eigen::Tensor<double, 2>(N * 3, N * 3);
+  MatrixXd &M = *new MatrixXd(N * 3, N * 3);
+
+  M.setZero();
 
   for(int n = 0; n < N; n++) {
     for(int m = 0; m < N; m++) {
