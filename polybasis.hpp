@@ -17,7 +17,7 @@ double polyint(int n, int m, int l)
   return 2.0 * pow(0.5, l + 1) * ytmp / ((n + 1) * (m + 1) * (l + 1));
 }
 
-void build(int N, double X, double Y, double Z, Eigen::Tensor<double, 4> **dp_, Eigen::Tensor<double, 2> **pv_) {
+void buildBasis(int N, double X, double Y, double Z, Eigen::Tensor<double, 4> **dp_, Eigen::Tensor<double, 2> **pv_) {
   std::vector<int> ns, ms, ls;
 
   for(int i = 0; i < N + 1; i++)
@@ -42,6 +42,7 @@ void build(int N, double X, double Y, double Z, Eigen::Tensor<double, 4> **dp_, 
     Zs[i + 1] = pow(Z, i);
   }
 
+  #pragma omp parallel for
   for(int i = 0; i < ns.size(); i++) {
     for(int j = 0; j < ns.size(); j++) {
       int n0 = ns[i],
@@ -70,137 +71,6 @@ void build(int N, double X, double Y, double Z, Eigen::Tensor<double, 4> **dp_, 
   *dp_ = &dp;
   *pv_ = &pv;
 }
-/*
-cpdef buildRot(C, w, x, y, z):
-    # Code stolen from Will Lenthe
-    K = numpy.zeros((6, 6))
-    dKdQ = numpy.zeros((6, 6, 3, 3))
-
-    Q = numpy.array([[w**2 - (y**2 + z**2) + x**2, 2.0 * (x * y - w * z), 2.0 * (x * z + w * y)],
-                     [2.0 * (y * x + w * z), w**2 - (x**2 + z**2) + y**2, 2.0 * (y * z - w * x)],
-                     [2.0 * (z * x - w * y), 2.0 * (z * y + w * x), w**2 - (x**2 + y**2) + z**2]])
-
-    dQdw = numpy.array([[2 * w, -2.0 * z, 2.0 * y],
-                        [2.0 * z, 2 * w, -2.0 * x],
-                        [-2.0 * y, 2.0 * x, 2 * w]])
-
-    dQdx = numpy.array([[2 * x, 2.0 * y, 2.0 * z],
-                        [2.0 * y, -2.0 * x, -2.0 * w],
-                        [2.0 * z, 2.0 * w, -2.0 * x]])
-
-    dQdy = numpy.array([[-2 * y, 2 * x, 2 * w],
-                        [2 * x, 2 * y, 2 * z],
-                        [-2 * w, 2 * z, -2 * y]])
-
-    dQdz = numpy.array([[-2 * z, -2 * w, 2 * x],
-                        [2 * w, -2 * z, 2 * y],
-                        [2 * x, 2 * y, 2 * z]])
-
-    for i in range(3):
-        for j in range(3):
-            dKdQ[i, j, i, j] = 2.0 * Q[i, j]
-            dKdQ[i, j + 3, i, (j + 1) % 3] = Q[i, (j + 2) % 3]
-            dKdQ[i, j + 3, i, (j + 2) % 3] = Q[i, (j + 1) % 3]
-            dKdQ[i + 3, j, (i + 1) % 3, j] = Q[(i + 2) % 3, j]
-            dKdQ[i + 3, j, (i + 2) % 3, j] = Q[(i + 1) % 3, j]
-            dKdQ[i + 3, j + 3, (i + 1) % 3, (j + 1) % 3] = Q[(i + 2) % 3, (j + 2) % 3]
-            dKdQ[i + 3, j + 3, (i + 2) % 3, (j + 2) % 3] = Q[(i + 1) % 3, (j + 1) % 3]
-            dKdQ[i + 3, j + 3, (i + 1) % 3, (j + 2) % 3] = Q[(i + 2) % 3, (j + 1) % 3]
-            dKdQ[i + 3, j + 3, (i + 2) % 3, (j + 1) % 3] = Q[(i + 1) % 3, (j + 2) % 3]
-
-            K[i][j] = Q[i][j] * Q[i][j]
-            K[i][j + 3] = Q[i][(j + 1) % 3] * Q[i][(j + 2) % 3]
-            K[i + 3][j] = Q[(i + 1) % 3][j] * Q[(i + 2) % 3][j]
-            K[i + 3][j + 3] = Q[(i + 1) % 3][(j + 1) % 3] * Q[(i + 2) % 3][(j + 2) % 3] + Q[(i + 1) % 3][(j + 2) % 3] * Q[(i + 2) % 3][(j + 1) % 3]
-
-    for i in range(3):
-        for j in range(3):
-            K[i][j + 3] *= 2.0
-            dKdQ[i][j + 3] *= 2.0
-
-    Crot = K.dot(C.dot(K.T))
-    dCrotdQ = numpy.zeros((6, 6, 3, 3))
-    for i in range(3):
-        for j in range(3):
-            dCrotdQ[:, :, i, j] = dKdQ[:, :, i, j].dot(C.dot(K.T)) + K.dot(C.dot(dKdQ[:, :, i, j].T))
-
-    dCrotdw = numpy.zeros((6, 6))
-    dCrotdx = numpy.zeros((6, 6))
-    dCrotdy = numpy.zeros((6, 6))
-    dCrotdz = numpy.zeros((6, 6))
-
-    for i in range(6):
-        for j in range(6):
-            dCrotdw[i, j] = (dCrotdQ[i, j] * dQdw).flatten().sum()
-            dCrotdx[i, j] = (dCrotdQ[i, j] * dQdx).flatten().sum()
-            dCrotdy[i, j] = (dCrotdQ[i, j] * dQdy).flatten().sum()
-            dCrotdz[i, j] = (dCrotdQ[i, j] * dQdz).flatten().sum()
-
-    return Crot, dCrotdw, dCrotdx, dCrotdy, dCrotdz, K
-
-cpdef buildRot2(C, w, x, y, z):
-    # Code stolen from Will Lenthe
-    K = numpy.zeros((6, 6))
-    dKdQ = numpy.zeros((6, 6, 3, 3))
-
-    Q = numpy.array([[w**2 - (y**2 + z**2) + x**2, 2.0 * (x * y - w * z), 2.0 * (x * z + w * y)],
-                     [2.0 * (y * x + w * z), w**2 - (x**2 + z**2) + y**2, 2.0 * (y * z - w * x)],
-                     [2.0 * (z * x - w * y), 2.0 * (z * y + w * x), w**2 - (x**2 + y**2) + z**2]])
-
-    dQdw = numpy.array([[2 * w, -2.0 * z, 2.0 * y],
-                        [2.0 * z, 2 * w, -2.0 * x],
-                        [-2.0 * y, 2.0 * x, 2 * w]])
-
-    dQdx = numpy.array([[2 * x, 2.0 * y, 2.0 * z],
-                        [2.0 * y, -2.0 * x, -2.0 * w],
-                        [2.0 * z, 2.0 * w, -2.0 * x]])
-
-    dQdy = numpy.array([[-2 * y, 2 * x, 2 * w],
-                        [2 * x, 2 * y, 2 * z],
-                        [-2 * w, 2 * z, -2 * y]])
-
-    dQdz = numpy.array([[-2 * z, -2 * w, 2 * x],
-                        [2 * w, -2 * z, 2 * y],
-                        [2 * x, 2 * y, 2 * z]])
-
-    Cv = numpy.zeros((3, 3, 3, 3))
-
-    Cv = Cvoigt(C)
-
-    Crot = numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, Q, Q)
-
-    dCrotdw = numpy.einsum('ip, jq, pqrs, kr, ls', dQdw, Q, Cv, Q, Q) + numpy.einsum('ip, jq, pqrs, kr, ls', Q, dQdw, Cv, Q, Q) + \
-        numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, dQdw, Q) + numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, Q, dQdw)
-
-    dCrotdx = numpy.einsum('ip, jq, pqrs, kr, ls', dQdx, Q, Cv, Q, Q) + numpy.einsum('ip, jq, pqrs, kr, ls', Q, dQdx, Cv, Q, Q) + \
-        numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, dQdx, Q) + numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, Q, dQdx)
-
-    dCrotdy = numpy.einsum('ip, jq, pqrs, kr, ls', dQdy, Q, Cv, Q, Q) + numpy.einsum('ip, jq, pqrs, kr, ls', Q, dQdy, Cv, Q, Q) + \
-        numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, dQdy, Q) + numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, Q, dQdy)
-
-    dCrotdz = numpy.einsum('ip, jq, pqrs, kr, ls', dQdz, Q, Cv, Q, Q) + numpy.einsum('ip, jq, pqrs, kr, ls', Q, dQdz, Cv, Q, Q) + \
-        numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, dQdz, Q) + numpy.einsum('ip, jq, pqrs, kr, ls', Q, Q, Cv, Q, dQdz)
-
-    return Crot, dCrotdw, dCrotdx, dCrotdy, dCrotdz, Q
-
-cpdef inline numpy.ndarray[numpy.double_t, ndim = 4] Cvoigt(numpy.ndarray[numpy.double_t, ndim = 2] Ch):
-    cdef numpy.ndarray[numpy.double_t, ndim = 4] C
-    cdef int i, j, k, l, n, m
-
-    C = numpy.zeros((3, 3, 3, 3))
-
-    voigt = [[(0, 0)], [(1, 1)], [(2, 2)], [(1, 2), (2, 1)], [(0, 2), (2, 0)], [(0, 1), (1, 0)]]
-
-    for i in range(6):
-        for j in range(6):
-            for k, l in voigt[i]:
-                for n, m in voigt[j]:
-                    C[k, l, n, m] = Ch[i, j]
-    return C
-
-import cython
-from cython cimport parallel
-*/
 
 void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::Tensor<double, 2> &pv, double density, MatrixXd **K_, MatrixXd **M_) {
   int N = dp.dimension(0);
@@ -293,6 +163,7 @@ void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::
 
   K.setZero();
 
+  #pragma omp parallel for
   for(int n = 0; n < N; n++)
     for(int m = 0; m < N; m++)
       for(int i = 0; i < 3; i++)

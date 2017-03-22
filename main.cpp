@@ -31,8 +31,11 @@ extern "C" void dsygvx_(int *itype,
 
 MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int il, int iu)
 {
-  MatrixXd At = A.transpose().eval();
-  MatrixXd Bt = B.transpose().eval();
+  // Rescaling the matrices a little seems to help the solve go faster, won't hurt the eigenvalues/vecs
+  double max = std::min(A.maxCoeff(), B.maxCoeff());
+
+  MatrixXd At = A.transpose().eval() / max;
+  MatrixXd Bt = B.transpose().eval() / max;
 
   il += 1;
   iu += 1;
@@ -53,12 +56,12 @@ MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int il, int iu)
   double workQuery = 0.0;
   int lworkQuery = -1;
 
-  double tmp = omp_get_wtime();
+  //double tmp = omp_get_wtime();
 
   // First call computes optimal workspace storage size
   dsygvx_(&itype, "V", "I", "L", &N, At.data(), &lda, Bt.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, W.data(), Z.data(), &ldz, &workQuery, &lworkQuery, &iwork[0], &ifail[0], &info);
 
-  printf("Info %d, M %d, opt %f, %f\n", info, M, workQuery, omp_get_wtime() - tmp);
+  //printf("Info %d, M %d, opt %f, %f\n", info, M, workQuery, omp_get_wtime() - tmp);
 
   int lwork = int(workQuery) + 1;
   std::vector<double> work(lwork);
@@ -66,7 +69,7 @@ MatrixXd eigsD(MatrixXd &A, MatrixXd &B, int il, int iu)
   // Second call actually computes the eigenvalues and eigenvectors!
   dsygvx_(&itype, "V", "I", "L", &N, At.data(), &lda, Bt.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, W.data(), Z.data(), &ldz, &work[0], &lwork, &iwork[0], &ifail[0], &info);
 
-  printf("Info %d, M %d, opt %f, %f\n", info, M, work[0], omp_get_wtime() - tmp);
+  //printf("Info %d, M %d, opt %f, %f\n", info, M, work[0], omp_get_wtime() - tmp);
   
   return W;
 }
@@ -137,7 +140,9 @@ int main(int argc, char **argv)
   Eigen::Tensor<double, 4> *dp;
   Eigen::Tensor<double, 2> *pv;
   
-  build(14, X, Y, Z, &dp, &pv);
+  double tmp = omp_get_wtime();
+  buildBasis(14, X, Y, Z, &dp, &pv);
+  printf("buildBasis %f\n", omp_get_wtime() - tmp);
 
   Eigen::Tensor<double, 2> C(6, 6);
 
@@ -149,20 +154,16 @@ int main(int argc, char **argv)
                {0, 0, 0, 0, 0, c44}});
 
   MatrixXd *K, *M;
-  
+
+  tmp = omp_get_wtime();
   buildKM(C, *dp, *pv, density, &K, &M);
+  printf("buildKM %f\n", omp_get_wtime() - tmp);
 
-  /*for(int i = 0; i < M->rows(); i++) {
-    for(int j = 0; j < M->cols(); j++) {
-      (*K)(i, j) /= 1e-6;
-      (*M)(i, j) /= 1e-6;
-    }
-    }*/
-
-  double tmp = omp_get_wtime();
-  MatrixXd eigs = eigsD(*K, *M, 6, 59);
+  tmp = omp_get_wtime();
+  MatrixXd *eigs, *evecs;
+  eigsD(*K, *M, 6, 59, &eigs, &evecs);
   printf("Time %f\n", omp_get_wtime() - tmp);
-
+  
   /*M->setZero();
 
   for(int i = 0; i < M->rows(); i++) {
