@@ -1,8 +1,11 @@
+#ifndef polybasis_hpp_
+#define polybasis_hpp_
+
 #include <cmath>
 #include <eigen3/Eigen/Core>
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
 
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
+#include "util.hpp"
 
 double polyint(int n, int m, int l)
 {
@@ -193,3 +196,6 @@ void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::
 
   *M_ = &M;
 }
+
+#endif
+
