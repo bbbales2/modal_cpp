@@ -78,9 +78,9 @@ void eigSolve(MatrixXd &A, MatrixXd &B, int il, int iu, MatrixXd **eigs, MatrixX
 }
 
 void mechanics(double c11, double anisotropic, double c44, //Changing parameters
-               Eigen::Tensor<double, 4> *dp, Eigen::Tensor<double, 2> *pv, double density, unsigned int nevs, //Tables of initialized data + Constants
-               MatrixXd **freqs, MatrixXd **dfreqs_dc11) { // Output
-               // Derivatives
+               Eigen::Tensor<double, 4> *dp, Eigen::Tensor<double, 2> *pv, double density, unsigned int nevs, // Constants
+               MatrixXd **freqs,  // Output
+               MatrixXd **dfreqs_dc11 = NULL, MatrixXd **dfreqs_da = NULL, MatrixXd **dfreqs_dc44 = NULL) { // Derivatives
   double c12 = -(c44 * 2.0 / anisotropic - c11);
 
   Eigen::Tensor<double, 2> C(6, 6);
@@ -101,34 +101,95 @@ void mechanics(double c11, double anisotropic, double c44, //Changing parameters
                     {0, 0, 0, 0, 0, 0},
                     {0, 0, 0, 0, 0, 0}});
 
+  Eigen::Tensor<double, 2> dCda(6, 6);
+
+  double dc12da = c44 * 2.0 / (anisotropic * anisotropic);
+
+  dCda.setValues({{0.0, dc12da, dc12da, 0, 0, 0},
+                    {dc12da, 0.0, dc12da, 0, 0, 0},
+                    {dc12da, dc12da, 0.0, 0, 0, 0},
+                    {0, 0, 0, 0, 0, 0},
+                    {0, 0, 0, 0, 0, 0},
+                    {0, 0, 0, 0, 0, 0}});
+
+  Eigen::Tensor<double, 2> dCdc44(6, 6);
+
+  double dc12dc44 = -2.0 / anisotropic;
+
+  dCdc44.setValues({{0, dc12dc44, dc12dc44, 0, 0, 0},
+                    {dc12dc44, 0, dc12dc44, 0, 0, 0},
+                    {dc12dc44, dc12dc44, 0, 0, 0, 0},
+                    {0, 0, 0, 1.0, 0, 0},
+                    {0, 0, 0, 0, 1.0, 0},
+                    {0, 0, 0, 0, 0, 1.0}});
+
   MatrixXd *K, *M, *_;
-  MatrixXd *dKdc11;
+  MatrixXd *dKdc11, *dKda, *dKdc44;
 
   double tmp = omp_get_wtime();
   buildKM(C, *dp, *pv, density, &K, &M);
-  buildKM(dCdc11, *dp, *pv, density, &dKdc11, &_);
-  printf("buildKM %f\n", omp_get_wtime() - tmp);
+  buildKM(dCdc11, *dp, *pv, density, &dKdc11, &_); delete _;
+  buildKM(dCda, *dp, *pv, density, &dKda, &_); delete _;
+  buildKM(dCdc44, *dp, *pv, density, &dKdc44, &_); delete _;
+
+  if(DEBUG)
+    printf("buildKM %f\n", omp_get_wtime() - tmp);
 
   MatrixXd *eigs, *evecs;
   
   tmp = omp_get_wtime();
-  eigSolve(*K, *M, 6, 6 + nevs, &eigs, &evecs);
-  printf("eigSolve %f\n", omp_get_wtime() - tmp);
+  eigSolve(*K, *M, 6, 6 + nevs - 1, &eigs, &evecs);
 
-  *freqs = new MatrixXd((*eigs).rows(), (*eigs).cols());
-  *dfreqs_dc11 = new MatrixXd((*eigs).rows(), (*eigs).cols());
+  int N = K->rows();
+  
+  if(DEBUG)
+    printf("eigSolve %f\n", omp_get_wtime() - tmp);
+  
+  *freqs = new MatrixXd(nevs, 1);
+
+  if(dfreqs_dc11)
+    *dfreqs_dc11 = new MatrixXd(nevs, 1);
+
+  if(dfreqs_da)
+    *dfreqs_da = new MatrixXd(nevs, 1);
+
+  if(dfreqs_dc44)
+    *dfreqs_dc44 = new MatrixXd(nevs, 1);
 
   for(int i = 0; i < (*eigs).rows(); i++) {
-    (**dfreqs_dc11)(i, 0) = ((*evecs).block(0, i, (*evecs).rows(), 1).transpose() * (*dKdc11) * (*evecs).block(0, i, (*evecs).rows(), 1))(0, 0);
+    if(dfreqs_dc11)
+      (**dfreqs_dc11)(i, 0) = ((*evecs).block(0, i, N, 1).transpose() * (*dKdc11) * (*evecs).block(0, i, N, 1))(0, 0);
+    
+    if(dfreqs_da)
+      (**dfreqs_da)(i, 0) = ((*evecs).block(0, i, N, 1).transpose() * (*dKda) * (*evecs).block(0, i, N, 1))(0, 0);
+    
+    if(dfreqs_dc44)
+      (**dfreqs_dc44)(i, 0) = ((*evecs).block(0, i, N, 1).transpose() * (*dKdc44) * (*evecs).block(0, i, N, 1))(0, 0);
   }
 
   for(int i = 0; i < (*eigs).rows(); i++) {
     (**freqs)(i) = sqrt(((*eigs)(i, 0)) * 1.0e11) / (M_PI * 2000.0);
-    (**dfreqs_dc11)(i, 0) *= 0.5e11 / (sqrt(((*eigs)(i, 0)) * 1.0e11) * M_PI * 2000.0);
+    double dfde = 0.5e11 / (sqrt(((*eigs)(i, 0)) * 1.0e11) * M_PI * 2000.0);
+
+    if(dfreqs_dc11)
+      (**dfreqs_dc11)(i, 0) *= dfde;
+
+    if(dfreqs_da)
+      (**dfreqs_da)(i, 0) *= dfde;
+
+    if(dfreqs_dc44)
+      (**dfreqs_dc44)(i, 0) *= dfde;
   }
 
   delete eigs;
   delete evecs;
+
+  delete K;
+  delete M;
+  
+  delete dKdc11;
+  delete dKda;
+  delete dKdc44;
 }
 
 #endif

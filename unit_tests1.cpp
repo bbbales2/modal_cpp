@@ -25,7 +25,8 @@ int main(int argc, char **argv) {
   
   double tmp = omp_get_wtime();
   buildBasis(10, X, Y, Z, &dp, &pv);
-  printf("buildBasis %f\n", omp_get_wtime() - tmp);
+  if(DEBUG)
+    printf("buildBasis %f\n", omp_get_wtime() - tmp);
 
   MatrixXd *eigs, *deigs_dc11, *deigs_da, *deigs_dc44, *_;
 
@@ -34,7 +35,8 @@ int main(int argc, char **argv) {
   //tmp = omp_get_wtime();
   mechanics(c11, anisotropic, c44, // Params
             dp, pv, density, nevs, // Ref data
-            &eigs, &deigs_dc11); // Output
+            &eigs, // Output
+            &deigs_dc11, &deigs_da, &deigs_dc44); // Gradients
 
   bool passed = true;
 
@@ -59,7 +61,6 @@ int main(int argc, char **argv) {
                                   4.14376517, 0.14082727, 1.55553782, 2.40418028 };
 
   for(int i = 0; i < nevs; i++) {
-    //std::cout << (*deigs_dc11)(i, 0) << " * " << ref_deigs_dc11[i] << std::endl;
     if(std::abs((*deigs_dc11)(i, 0) - ref_deigs_dc11[i]) > etol) {
       passed = false;
     }
@@ -73,17 +74,37 @@ int main(int argc, char **argv) {
 
   passed = true;
 
-  MatrixXd *eigst_c11, *eigst_anisotropic, *eigst_c44;
+  MatrixXd *eigst_c11, *eigst_a, *eigst_c44;
   double delta = 0.00001;
   
   mechanics(c11 + delta, anisotropic, c44, // Params
             dp, pv, density, nevs, // Ref data
-            &eigst_c11, &_); // Output
+            &eigst_c11); // Output
+
+  mechanics(c11, anisotropic + delta, c44, // Params
+            dp, pv, density, nevs, // Ref data
+            &eigst_a); // Output
+
+  mechanics(c11, anisotropic, c44 + delta, // Params
+            dp, pv, density, nevs, // Ref data
+            &eigst_c44); // Output
 
   for(int i = 0; i < nevs; i++) {
     double approxd = ((*eigst_c11)(i, 0) - (*eigs)(i, 0)) / delta;
-    //printf("%f %f\n", approxd, (*deigs_dc11)(i, 0));
+    //printf("c11 %f %f\n", approxd, (*deigs_dc11)(i, 0));
     if(std::abs(approxd - (*deigs_dc11)(i, 0)) > etol) {
+      passed = false;
+    }
+
+    approxd = ((*eigst_a)(i, 0) - (*eigs)(i, 0)) / delta;
+    //printf("a   %f %f\n", approxd, (*deigs_da)(i, 0));
+    if(std::abs(approxd - (*deigs_da)(i, 0)) > etol) {
+      passed = false;
+    }
+
+    approxd = ((*eigst_c44)(i, 0) - (*eigs)(i, 0)) / delta;
+    //printf("c44 %f %f\n", approxd, (*deigs_dc44)(i, 0));
+    if(std::abs(approxd - (*deigs_dc44)(i, 0)) > etol) {
       passed = false;
     }
   }  
@@ -94,5 +115,17 @@ int main(int argc, char **argv) {
     printf("gradient check failed\n");
   }
 
+  delete dp;
+  delete pv;
+  delete eigs;
+
+  delete deigs_dc11;
+  delete deigs_da;
+  delete deigs_dc44;
+
+  delete eigst_c11;
+  delete eigst_a;
+  delete eigst_c44;
+  
   return 0;
 }
