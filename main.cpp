@@ -14,9 +14,8 @@ const double X = 0.007753,
   Z = 0.013199;
 
 const double density = 4401.695921;
-const double sigma = 0.5; // Not estimating sigma for simple case!!
 
-const double dt = 1e-4;
+double dt = 1e-5;
 const double L = 50;
 
 int P = 10;
@@ -32,8 +31,8 @@ std::normal_distribution<double> normal(0.0, 1.0);
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
 
 void UgradU(ArrayXd p, // n params
-            double *logp, // Log liklihood
-            ArrayXd *dlogp) { // Dlog likelihood Dparams
+            double *nlogp, // negative Log liklihood
+            ArrayXd *dnlogp) { // negative Dlog likelihood Dparams
   MatrixXd *freqs, *dfreqs_dc11, *dfreqs_da, *dfreqs_dc44;
 
   mechanics(p(0, 0), p(1, 0), p(2, 0), // Params
@@ -41,12 +40,17 @@ void UgradU(ArrayXd p, // n params
             &freqs, // Output
             &dfreqs_dc11, &dfreqs_da, &dfreqs_dc44); // Gradients
 
-  ArrayXd diff = (freqs->array() - data).eval();
-  *logp = 0.5 * (diff * diff).sum() / (sigma * sigma);
-  (*dlogp)(0, 0) = (dfreqs_dc11->array() * diff).sum() / (sigma * sigma);
-  (*dlogp)(1, 0) = (dfreqs_da->array() * diff).sum() / (sigma * sigma);
-  (*dlogp)(2, 0) = (dfreqs_dc44->array() * diff).sum() / (sigma * sigma);
+  double sigma = p(3, 0);
+
+  //std::cout << freqs->transpose() << std::endl;
   
+  ArrayXd diff = (freqs->array() - data).eval();
+  *nlogp = 0.5 * (diff * diff).sum() / (sigma * sigma) + 2 * N * log(sigma);
+  (*dnlogp)(0, 0) = (dfreqs_dc11->array() * diff).sum() / (sigma * sigma);
+  (*dnlogp)(1, 0) = (dfreqs_da->array() * diff).sum() / (sigma * sigma);
+  (*dnlogp)(2, 0) = (dfreqs_dc44->array() * diff).sum() / (sigma * sigma);
+  (*dnlogp)(3, 0) = 2 * N / sigma - (diff * diff).sum() / (sigma * sigma * sigma);
+
   delete freqs;
   delete dfreqs_dc11;
   delete dfreqs_da;
@@ -56,46 +60,48 @@ void UgradU(ArrayXd p, // n params
 ArrayXd sample(ArrayXd cq) {
   ArrayXd q = cq;
 
-  ArrayXd p(3, 1);
-  for(int i = 0; i < 3; i++)
+  ArrayXd p(4, 1);
+  for(int i = 0; i < 4; i++)
     p(i, 0) = normal(generator);
   
   ArrayXd cp = p;
 
-  ArrayXd dlogp(3, 1);
-  double logp;
+  ArrayXd dnlogp(4, 1);
+  double nlogp;
 
-  UgradU(q, &logp, &dlogp);
+  UgradU(q, &nlogp, &dnlogp);
 
-  double cU = logp;
+  double cU = nlogp;
+  std::cout << q.transpose() << " - " << cU << std::endl;
   
-  p -= dt * dlogp / 2.0;
+  p -= dt * dnlogp / 2.0;
 
   for(int i = 0; i < L; i++) {
     q += dt * p;
 
-    UgradU(q, &logp, &dlogp);
+    UgradU(q, &nlogp, &dnlogp);
 
     //std::cout << q << std::endl;
 
     if(i != L - 1)
-      p -= dt * dlogp;
+      p -= dt * dnlogp;
   }
 
-  UgradU(q, &logp, &dlogp);
+  UgradU(q, &nlogp, &dnlogp);
 
-  p -= dt * dlogp / 2.0;
+  p -= dt * dnlogp / 2.0;
 
   p = -p;
 
   double cK = (cp * cp).sum() / 2.0;
-  double pU = logp;
+  double pU = nlogp;
   double pK = (p * p).sum() / 2.0;
 
-  //std::cout << "cu" << cU << std::endl;
-  //std::cout << "pu" << pU << std::endl;
-  //std::cout << "ck" << cK << std::endl;
-  //std::cout << "pk" << pK << std::endl;
+  /*std::cout << "cu " << cU << std::endl;
+  std::cout << "pu " << pU << std::endl;
+  std::cout << "ck " << cK << std::endl;
+  std::cout << "pk " << pK << std::endl;
+  std::cout << "c - p " << cU - pU + cK - pK << std::endl;*/
   
   if(uniform(generator) < exp(cU - pU + cK - pK)) {
     //std::cout << "accepted" << std::endl << std::endl;
@@ -119,74 +125,26 @@ int main(int argc, char **argv) {
   double logp;
   int S = 1000;
 
-  ArrayXd q(3, 1);
-  ArrayXd qs(3, N);
-  q << 1.685, 1.0, 0.446;
+  ArrayXd q(4, 1);
+  ArrayXd qs(4, S);
+  q << 2.0, 1.0, 1.0, 2.0;
 
-  for(int i = 0; i < S; i++) {
-    qs.block(0, i, 3, 1) = sample(q);
+  dt = 1e-5;
 
-    std::cout << qs.block(0, i, 3, 1).transpose() << std::endl;
-  }
+  q = sample(q);
+  q = sample(q);
+  q = sample(q);
+  q = sample(q);
 
-  /*ArrayXd p(3, 1);
-  for(int i = 0; i < 3; i++)
-    p(i, 0) = normal(generator);
+  dt = 2e-4;
   
-  ArrayXd dlogp(3, 1);
+  for(int i = 0; i < S; i++) {
+    q = sample(q);
+    
+    qs.block(0, i, 4, 1) = q;
 
-  UgradU(p, &logp, &dlogp);*/
+    std::cout << qs.block(0, i, 4, 1).transpose() << std::endl;
+  }
 
   return 0;
 }
-
-/*int main2(int argc, char **argv) {
-  int N = 10;
-
-  MatrixXd A(N, N);
-  MatrixXd B(N, N);
-
-  //Eigen::Tensor<double, 2, Eigen::ColMajor> &A = *new Eigen::Tensor<double, 2, Eigen::ColMajor>(N, N);
-
-  //A.setRandom();
-
-  //for(int i = 0; i < N; i++) {
-  //  for(int j = i; j < N; j++) {
-  //    A(j, i) = A(i, j);
-  //  }
-  //}
-
-  A.setZero();
-  B.setZero();
-
-  for(int i = 0; i < N; i++) {
-    for(int j = 0; j < N; j++) {
-      if(i == j) {
-        A(i, j) = i + 1.0;
-        B(i, j) = 2.00;
-        printf("%d %d %f %f\n", i, j, B(i, j), A(i, j));
-      }
-    }
-  }
-
-  double tmp = omp_get_wtime();
-  MatrixXd *eigs, *evecs;
-  eigsD(A, B, 0, 7, &eigs, &evecs);
-  printf("Time %f\n", omp_get_wtime() - tmp);
-  
-  printf("Eigenvalues:\n");
-  for(int i = 0; i < eigs.rows(); i++) {
-    for(int j = 0; j < eigs.cols(); j++) {
-      printf("%e ", eigs(i, j));
-    }
-    printf("\n");
-  }
-
-  //printf("\nEigenvectors:\n");
-  //for(int i = 0; i < N; i++) {
-  //  for(int j = 0; j < nev; j++) {
-  //    printf("%f ", Z(i, j));
-  //  }
-  //  printf("\n");
-  //}
-}*/
