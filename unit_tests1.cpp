@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   Eigen::Tensor<double, 2> *pv;
   
   double tmp = omp_get_wtime();
-  buildBasis(10, X, Y, Z, &dp, &pv);
+  buildBasis(10, X, Y, Z, density, &dp, &pv);
   if(DEBUG)
     printf("buildBasis %f\n", omp_get_wtime() - tmp);
 
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
 
   //tmp = omp_get_wtime();
   mechanics(c11, anisotropic, c44, // Params
-            dp, pv, density, nevs, // Ref data
+            dp, pv, nevs, // Ref data
             &eigs, // Output
             &deigs_dc11, &deigs_da, &deigs_dc44); // Gradients
 
@@ -78,15 +78,15 @@ int main(int argc, char **argv) {
   double delta = 0.00001;
   
   mechanics(c11 + delta, anisotropic, c44, // Params
-            dp, pv, density, nevs, // Ref data
+            dp, pv, nevs, // Ref data
             &eigst_c11); // Output
 
   mechanics(c11, anisotropic + delta, c44, // Params
-            dp, pv, density, nevs, // Ref data
+            dp, pv, nevs, // Ref data
             &eigst_a); // Output
 
   mechanics(c11, anisotropic, c44 + delta, // Params
-            dp, pv, density, nevs, // Ref data
+            dp, pv, nevs, // Ref data
             &eigst_c44); // Output
 
   for(int i = 0; i < nevs; i++) {

@@ -7,6 +7,9 @@
 
 #include "util.hpp"
 
+// This file contains some helper functions which build the lookup tables necessary for solving for the resonance modes of the material
+// Look at Visscher 1991 (http://dx.doi.org/10.1121/1.401643) for more details
+
 double polyint(int n, int m, int l)
 {
   double xtmp, ytmp;
@@ -20,7 +23,7 @@ double polyint(int n, int m, int l)
   return 2.0 * pow(0.5, l + 1) * ytmp / ((n + 1) * (m + 1) * (l + 1));
 }
 
-void buildBasis(int N, double X, double Y, double Z, Eigen::Tensor<double, 4> **dp_, Eigen::Tensor<double, 2> **pv_) {
+void buildBasis(int N, double X, double Y, double Z, double density, Eigen::Tensor<double, 4> **dp_, Eigen::Tensor<double, 2> **pv_) {
   std::vector<int> ns, ms, ls;
 
   for(int i = 0; i < N + 1; i++)
@@ -67,7 +70,7 @@ void buildBasis(int N, double X, double Y, double Z, Eigen::Tensor<double, 4> **
       dp(i, j, 2, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * l0 * m1;
       dp(i, j, 2, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 ] * polyint(n1 + n0, m1 + m0, l1 + l0 - 2) * l0 * l1;
 
-      pv(i, j) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0, l1 + l0);
+      pv(i, j) = density * Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0, l1 + l0);
     }
   }
 
@@ -75,7 +78,7 @@ void buildBasis(int N, double X, double Y, double Z, Eigen::Tensor<double, 4> **
   *pv_ = &pv;
 }
 
-void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::Tensor<double, 2> &pv, double density, MatrixXd **K_, MatrixXd **M_) {
+void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::Tensor<double, 2> &pv, MatrixXd **K_, MatrixXd **M_) {
   int N = dp.dimension(0);
 
   Eigen::Tensor<double, 4> C(3, 3, 3, 3);
@@ -188,9 +191,9 @@ void buildKM(Eigen::Tensor<double, 2> &Ch, Eigen::Tensor<double, 4> &dp, Eigen::
 
   for(int n = 0; n < N; n++) {
     for(int m = 0; m < N; m++) {
-      M(n * 3 + 0, m * 3 + 0) = density * pv(n, m);
-      M(n * 3 + 1, m * 3 + 1) = density * pv(n, m);
-      M(n * 3 + 2, m * 3 + 2) = density * pv(n, m);
+      M(n * 3 + 0, m * 3 + 0) = pv(n, m);
+      M(n * 3 + 1, m * 3 + 1) = pv(n, m);
+      M(n * 3 + 2, m * 3 + 2) = pv(n, m);
     }
   }
 

@@ -10,6 +10,7 @@
 
 #include "util.hpp"
 
+// Lapack dense symmetric, generalized eigensolve
 extern "C" void dsygvx_(int *itype,
                         const char *jobz,
                         const char *range,
@@ -34,6 +35,7 @@ extern "C" void dsygvx_(int *itype,
                         int *ifail,
                         int *info);
 
+// Wrap up the eigensolver in a C++ function
 void eigSolve(MatrixXd &A, MatrixXd &B, int il, int iu, MatrixXd **eigs, MatrixXd **evecs)
 {
   // Rescaling the matrices a little seems to help the solve go faster, won't hurt the eigenvalues/vecs
@@ -77,8 +79,19 @@ void eigSolve(MatrixXd &A, MatrixXd &B, int il, int iu, MatrixXd **eigs, MatrixX
   //printf("Info %d, M %d, opt %f, %f\n", info, M, work[0], omp_get_wtime() - tmp);
 }
 
+// Mechanics solver
+//   This takes in the parameters, some lookup tables, and some constants
+//   and outputs the resonance modes and all the derivatives of the
+//   resonance modes with respect to each parameter
+//
+//   Input: c11, anisotropic, c44 <- Changing mechanics parameters
+//          dp, pv <-- Lookup tables for Rayleigh-Ritz approx to problem
+//          nev <-- Number of resonance modes to compute
+//   Output:
+//          freqs nev x 1 <-- Matrix of resonance modes (directly comparable to data)
+//          (optional) dfreqs_dc11, dfreqs_da, dfreqs_dc44 nev x 1 <-- Matrices of derivatives of each resonance mode with respect to each parameter
 void mechanics(double c11, double anisotropic, double c44, //Changing parameters
-               Eigen::Tensor<double, 4> *dp, Eigen::Tensor<double, 2> *pv, double density, unsigned int nevs, // Constants
+               Eigen::Tensor<double, 4> *dp, Eigen::Tensor<double, 2> *pv, unsigned int nevs, // Constants
                MatrixXd **freqs,  // Output
                MatrixXd **dfreqs_dc11 = NULL, MatrixXd **dfreqs_da = NULL, MatrixXd **dfreqs_dc44 = NULL) { // Derivatives
   double c12 = -(c44 * 2.0 / anisotropic - c11);
@@ -127,10 +140,10 @@ void mechanics(double c11, double anisotropic, double c44, //Changing parameters
   MatrixXd *dKdc11, *dKda, *dKdc44;
 
   double tmp = omp_get_wtime();
-  buildKM(C, *dp, *pv, density, &K, &M);
-  buildKM(dCdc11, *dp, *pv, density, &dKdc11, &_); delete _;
-  buildKM(dCda, *dp, *pv, density, &dKda, &_); delete _;
-  buildKM(dCdc44, *dp, *pv, density, &dKdc44, &_); delete _;
+  buildKM(C, *dp, *pv, &K, &M);
+  buildKM(dCdc11, *dp, *pv, &dKdc11, &_); delete _;
+  buildKM(dCda, *dp, *pv, &dKda, &_); delete _;
+  buildKM(dCdc44, *dp, *pv, &dKdc44, &_); delete _;
 
   if(DEBUG)
     printf("buildKM %f\n", omp_get_wtime() - tmp);
