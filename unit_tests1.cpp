@@ -4,12 +4,16 @@
 #include <stdio.h>
 #include <iostream>
 
+#include "magma.h"
+
 #include "polybasis.hpp"
 #include "mechanics.hpp"
 
 const double etol = 1e-2; //10hz
 
 int main(int argc, char **argv) {
+  magma_init();
+  
   double X = 0.007753,
     Y = 0.009057,
     Z = 0.013199;

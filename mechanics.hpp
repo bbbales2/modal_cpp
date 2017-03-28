@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <cmath>
+#include "magma_d.h"
 
 #include "util.hpp"
 
@@ -35,6 +36,8 @@ extern "C" void dsygvx_(int *itype,
                         int *ifail,
                         int *info);
 
+
+
 // Wrap up the eigensolver in a C++ function
 void eigSolve(MatrixXd &A, MatrixXd &B, int il, int iu, MatrixXd **eigs, MatrixXd **evecs)
 {
@@ -56,25 +59,45 @@ void eigSolve(MatrixXd &A, MatrixXd &B, int il, int iu, MatrixXd **eigs, MatrixX
   int M = 0;
   *eigs = new MatrixXd(iu - il + 1, 1);
   *evecs = new MatrixXd(N, iu - il + 1); // Fortran wants col order, so we give it row order transposed instead
-  std::vector<int> iwork(5 * N);
   std::vector<int> ifail(N);
   int info = 0;
   double zero = 0.0;
   double workQuery = 0.0;
+  int iworkQuery = 0;
   int lworkQuery = -1;
 
   //double tmp = omp_get_wtime();
 
   // First call computes optimal workspace storage size
-  dsygvx_(&itype, "V", "I", "U", &N, A.data(), &lda, B.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, (**eigs).data(), (**evecs).data(), &ldz, &workQuery, &lworkQuery, &iwork[0], &ifail[0], &info);
+  //dsygvx_(&itype, "V", "I", "U", &N, A.data(), &lda, B.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, (**eigs).data(), (**evecs).data(), &ldz, &workQuery, &lworkQuery, &iwork[0], &ifail[0], &info);
+  /*magma_dsygvdx_2stage(
+    magma_int_t itype, magma_vec_t jobz, magma_range_t range, magma_uplo_t uplo, magma_int_t n,
+    double *A, magma_int_t lda,
+    double *B, magma_int_t ldb,
+    double vl, double vu, magma_int_t il, magma_int_t iu,
+    magma_int_t *mout, double *w,
+    double *work, magma_int_t lwork,
+    #ifdef COMPLEX
+    double *rwork, magma_int_t lrwork,
+    #endif
+    magma_int_t *iwork, magma_int_t liwork,
+    magma_int_t *info);*/
+  // (**evecs).data(), ldz,
+ magma_dsygvdx_2stage(itype, MagmaVec, MagmaRangeI, MagmaLower, N, A.data(), lda, B.data(), ldb, zero, zero, il, iu, &M, (**eigs).data(), &workQuery, lworkQuery, &iworkQuery, -1, &info);
 
-  //printf("Info %d, M %d, opt %f, %f\n", info, M, workQuery, omp_get_wtime() - tmp);
+ //printf("Info %d, M %d, opt %f, %f\n", info, M, workQuery, omp_get_wtime() - tmp);
 
-  int lwork = int(workQuery) + 1;
+ printf("Info %d\n", info);
+
+  int lwork = int(workQuery) + 100000;
   std::vector<double> work(lwork);
+  std::vector<int> iwork(iworkQuery);
 
   // Second call actually computes the eigenvalues and eigenvectors!
-  dsygvx_(&itype, "V", "I", "U", &N, A.data(), &lda, B.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, (**eigs).data(), (**evecs).data(), &ldz, &work[0], &lwork, &iwork[0], &ifail[0], &info);
+  //dsygvx_(&itype, "V", "I", "U", &N, A.data(), &lda, B.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, (**eigs).data(), (**evecs).data(), &ldz, &work[0], &lwork, &iwork[0], &ifail[0], &info);
+ magma_dsygvdx_2stage(itype, MagmaVec, MagmaRangeI, MagmaLower, N, A.data(), lda, B.data(), ldb, zero, zero, il, iu, &M, (**eigs).data(), &work[0], lwork, &iwork[0], iwork.size(), &info);
+
+ //magma_dsygvx(&itype, "V", "I", "U", &N, A.data(), &lda, B.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, (**eigs).data(), (**evecs).data(), &ldz, &work[0], &lwork, &iwork[0], &ifail[0], &info);
 
   //printf("Info %d, M %d, opt %f, %f\n", info, M, work[0], omp_get_wtime() - tmp);
 }

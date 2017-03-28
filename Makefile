@@ -1,5 +1,5 @@
-CPPFLAGS=-fopenmp -I/usr/include/eigen3 --std=c++11 -g -O2 -msse
-LFLAGS=-llapack -fopenmp
+CPPFLAGS=-fopenmp -I/usr/include/eigen3 -I/home/bbales2/local/cuda/include -I/home/bbales2/magma-2.2.0/include --std=c++11 -g -msse
+LFLAGS=-Xcompiler "-fopenmp " -L/home/bbales2/magma-2.2.0/lib -lmagma -llapack -lblas -lcublas -lcusparse
 DEPS=util.hpp mechanics.hpp polybasis.hpp
 SOURCES=main.cpp unit_tests1.cpp unit_tests2.cpp
 
@@ -19,13 +19,13 @@ depend: .depend
 include .depend
 
 main: main.o
-	g++ $< $(LFLAGS) -o $@
+	nvcc $< -o $@ $(LFLAGS)
 
 unit_tests1: unit_tests1.o
-	g++ $< $(LFLAGS) -o $@
+	nvcc $< -o $@ $(LFLAGS)
 
 unit_tests2: unit_tests2.o
-	g++ $< $(LFLAGS) -o $@
+	nvcc $< -o $@ $(LFLAGS)
 
 clean:
 	-rm main.o unit_tests1.o unit_tests2.o main unit_tests1 unit_tests2
