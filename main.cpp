@@ -23,8 +23,8 @@ int P = 10;
 int N = 30;
 ArrayXd data(N, 1);
 
-Eigen::Tensor<double, 4> *dp;
-Eigen::Tensor<double, 2> *pv;
+dpT dp;
+pvT pv;
 
 std::default_random_engine generator;
 std::normal_distribution<double> normal(0.0, 1.0);
@@ -36,30 +36,28 @@ std::uniform_real_distribution<double> uniform(0.0, 1.0);
 //   Output: nlogp <-- negative log probability
 //           dnlogp 4x1 <-- derivative of negative log probability with respect to each parameter
 void UgradU(ArrayXd p, // n params
-            double *nlogp, // negative Log liklihood
-            ArrayXd *dnlogp) { // negative Dlog likelihood Dparams
-  MatrixXd *freqs, *dfreqs_dc11, *dfreqs_da, *dfreqs_dc44;
+            double &nlogp, // negative Log liklihood
+            ArrayXd &dnlogp) { // negative Dlog likelihood Dparams
+  VectorXd freqs, dfreqs_dc11, dfreqs_da, dfreqs_dc44;
 
   mechanics(p(0, 0), p(1, 0), p(2, 0), // Params
             dp, pv, N, // Ref data
-            &freqs, // Output
-            &dfreqs_dc11, &dfreqs_da, &dfreqs_dc44); // Gradients
+            freqs, // Output
+            dfreqs_dc11, dfreqs_da, dfreqs_dc44); // Gradients
 
   double sigma = p(3, 0);
 
   //std::cout << freqs->transpose() << std::endl;
   
-  ArrayXd diff = (freqs->array() - data).eval();
-  *nlogp = 0.5 * (diff * diff).sum() / (sigma * sigma) + N * log(sigma);
-  (*dnlogp)(0, 0) = (dfreqs_dc11->array() * diff).sum() / (sigma * sigma);
-  (*dnlogp)(1, 0) = (dfreqs_da->array() * diff).sum() / (sigma * sigma);
-  (*dnlogp)(2, 0) = (dfreqs_dc44->array() * diff).sum() / (sigma * sigma);
-  (*dnlogp)(3, 0) = N / sigma - (diff * diff).sum() / (sigma * sigma * sigma);
+  ArrayXd diff = (freqs.array() - data).eval();
+  nlogp = 0.5 * (diff * diff).sum() / (sigma * sigma) + N * log(sigma);
 
-  delete freqs;
-  delete dfreqs_dc11;
-  delete dfreqs_da;
-  delete dfreqs_dc44;
+  dnlogp.resize(4);
+  
+  dnlogp(0) = (dfreqs_dc11.array() * diff).sum() / (sigma * sigma);
+  dnlogp(1) = (dfreqs_da.array() * diff).sum() / (sigma * sigma);
+  dnlogp(2) = (dfreqs_dc44.array() * diff).sum() / (sigma * sigma);
+  dnlogp(3) = N / sigma - (diff * diff).sum() / (sigma * sigma * sigma);
 }
 
 // This is the Radford Neal HMC sampler.
@@ -77,7 +75,7 @@ ArrayXd sample(ArrayXd cq) {
   ArrayXd dnlogp(4, 1);
   double nlogp;
 
-  UgradU(q, &nlogp, &dnlogp);
+  UgradU(q, nlogp, dnlogp);
 
   double cU = nlogp;
   
@@ -86,7 +84,7 @@ ArrayXd sample(ArrayXd cq) {
   for(int i = 0; i < L; i++) {
     q += dt * p;
 
-    UgradU(q, &nlogp, &dnlogp);
+    UgradU(q, nlogp, dnlogp);
 
     //std::cout << q.transpose() << std::endl;
 
@@ -94,7 +92,7 @@ ArrayXd sample(ArrayXd cq) {
       p -= dt * dnlogp;
   }
 
-  UgradU(q, &nlogp, &dnlogp);
+  UgradU(q, nlogp, dnlogp);
 
   p -= dt * dnlogp / 2.0;
 
@@ -128,13 +126,13 @@ int main(int argc, char **argv) {
     288.796, 296.976, 301.101, 303.024, 305.115, 305.827,
     306.939, 310.428, 318.   , 319.457, 322.249, 323.464;
 
-  buildBasis(P, X, Y, Z, density, &dp, &pv);
+  buildBasis(P, X, Y, Z, density, dp, pv);
 
   double logp;
   int S = 10000;
 
   ArrayXd q(4, 1);
-  ArrayXd qs(4, S);
+  Array<double, Eigen::Dynamic, Eigen::Dynamic> qs(4, S);
   q << 2.0, 1.0, 1.0, 2.0; // "True" values ~ 1.685, 1.0, 0.446, 0.4
 
   // Doing a few small steps first works better (to get the sampler out of crazy-land)

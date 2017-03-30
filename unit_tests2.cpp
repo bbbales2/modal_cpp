@@ -22,38 +22,41 @@ int P = 10;
 int N = 30;
 ArrayXd data(N, 1);
 
-Eigen::Tensor<double, 4> *dp;
-Eigen::Tensor<double, 2> *pv;
+dpT dp;
+pvT pv;
 
 std::default_random_engine generator;
 std::normal_distribution<double> normal(0.0, 1.0);
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
 
+// This computes the negative log probability of the model as well
+//   as all the derivatives of the -logp for each param
+//   Input: p 4x1 <-- array with current params, c11, anisotropic ratio, c44, sigma
+//   Output: nlogp <-- negative log probability
+//           dnlogp 4x1 <-- derivative of negative log probability with respect to each parameter
 void UgradU(ArrayXd p, // n params
-            double *nlogp, // negative Log liklihood
-            ArrayXd *dnlogp) { // negative Dlog likelihood Dparams
-  MatrixXd *freqs, *dfreqs_dc11, *dfreqs_da, *dfreqs_dc44;
+            double &nlogp, // negative Log liklihood
+            ArrayXd &dnlogp) { // negative Dlog likelihood Dparams
+  VectorXd freqs, dfreqs_dc11, dfreqs_da, dfreqs_dc44;
 
   mechanics(p(0, 0), p(1, 0), p(2, 0), // Params
             dp, pv, N, // Ref data
-            &freqs, // Output
-            &dfreqs_dc11, &dfreqs_da, &dfreqs_dc44); // Gradients
+            freqs, // Output
+            dfreqs_dc11, dfreqs_da, dfreqs_dc44); // Gradients
 
   double sigma = p(3, 0);
 
   //std::cout << freqs->transpose() << std::endl;
   
-  ArrayXd diff = (freqs->array() - data).eval();
-  *nlogp = 0.5 * (diff * diff).sum() / (sigma * sigma) + N * log(sigma);
-  (*dnlogp)(0, 0) = (dfreqs_dc11->array() * diff).sum() / (sigma * sigma);
-  (*dnlogp)(1, 0) = (dfreqs_da->array() * diff).sum() / (sigma * sigma);
-  (*dnlogp)(2, 0) = (dfreqs_dc44->array() * diff).sum() / (sigma * sigma);
-  (*dnlogp)(3, 0) = N / sigma - (diff * diff).sum() / (sigma * sigma * sigma);
+  ArrayXd diff = (freqs.array() - data).eval();
+  nlogp = 0.5 * (diff * diff).sum() / (sigma * sigma) + N * log(sigma);
 
-  delete freqs;
-  delete dfreqs_dc11;
-  delete dfreqs_da;
-  delete dfreqs_dc44;
+  dnlogp.resize(4);
+  
+  dnlogp(0) = (dfreqs_dc11.array() * diff).sum() / (sigma * sigma);
+  dnlogp(1) = (dfreqs_da.array() * diff).sum() / (sigma * sigma);
+  dnlogp(2) = (dfreqs_dc44.array() * diff).sum() / (sigma * sigma);
+  dnlogp(3) = N / sigma - (diff * diff).sum() / (sigma * sigma * sigma);
 }
 
 double tol = 1e-5;
@@ -66,7 +69,7 @@ int main(int argc, char **argv) {
     288.796, 296.976, 301.101, 303.024, 305.115, 305.827,
     306.939, 310.428, 318.   , 319.457, 322.249, 323.464;
 
-  buildBasis(P, X, Y, Z, density, &dp, &pv);
+  buildBasis(P, X, Y, Z, density, dp, pv);
 
   double logp;
 
@@ -75,7 +78,7 @@ int main(int argc, char **argv) {
 
   ArrayXd dlogp(4, 1);
 
-  UgradU(p, &logp, &dlogp);
+  UgradU(p, logp, dlogp);
 
   if(abs(logp - 135.850409832) / 135.850409832 < tol) {
     std::cout << "Log probability passed" << std::endl;
@@ -93,7 +96,7 @@ int main(int argc, char **argv) {
 
   pt = p;
   pt(0, 0) = p(0, 0) + delta;
-  UgradU(pt, &logpt, &dlogp);
+  UgradU(pt, logpt, dlogp);
 
   if(abs(((logpt - logp) / delta - dlogp(0, 0)) / dlogp(0, 0)) < tol) {
     std::cout << "dc11 numerical gradient passed" << std::endl;
@@ -103,7 +106,7 @@ int main(int argc, char **argv) {
   
   pt = p;
   pt(1, 0) = p(1, 0) + delta;
-  UgradU(pt, &logpt, &dlogp);
+  UgradU(pt, logpt, dlogp);
 
   if(abs(((logpt - logp) / delta - dlogp(1, 0)) / dlogp(1, 0)) < tol) {
     std::cout << "da numerical gradient passed" << std::endl;
@@ -113,7 +116,7 @@ int main(int argc, char **argv) {
 
   pt = p;
   pt(2, 0) = p(2, 0) + delta;
-  UgradU(pt, &logpt, &dlogp);
+  UgradU(pt, logpt, dlogp);
 
   if(abs(((logpt - logp) / delta - dlogp(2, 0)) / dlogp(2, 0)) < tol) {
     std::cout << "dc44 numerical gradient passed" << std::endl;
@@ -123,7 +126,7 @@ int main(int argc, char **argv) {
 
   pt = p;
   pt(3, 0) = p(3, 0) + delta;
-  UgradU(pt, &logpt, &dlogp);
+  UgradU(pt, logpt, dlogp);
 
   if(abs(((logpt - logp) / delta - dlogp(3, 0)) / dlogp(3, 0)) < tol) {
     std::cout << "dsigma numerical gradient passed" << std::endl;
