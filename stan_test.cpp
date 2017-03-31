@@ -25,57 +25,38 @@ pvT pv;
 using namespace Eigen;
 using namespace stan::math;
 
-namespace stan {
-  namespace math {
-    class precomputed : public vari {
-    public:
-      int size_;
-      vari **avi_;
-      double *grad_;
+inline Matrix<var, Dynamic, 1> mech(int N, const dpT& dp, const pvT& pv,
+                                    const var& c11, const var& anisotropic, const var& c44) {
 
-      precomputed(int size, vari **avi, double val, double *grad) : size_(size), vari(val), avi_(avi), grad_(grad) {
-      }
-
-      void chain() {
-        for(int i = 0; i < size_; i++)
-          avi_[i]->adj_ += adj_ * grad_[i];
-      }
-    };
+  Matrix<double, Dynamic, 1> freqs(N),
+    dfreqs_dc11(N),
+    dfreqs_da(N),
+    dfreqs_dc44(N);
+  
+  mechanics(c11.vi_->val_, anisotropic.vi_->val_, c44.vi_->val_, // Params
+            dp, pv, N, // Ref data
+            freqs, // Output
+            dfreqs_dc11, dfreqs_da, dfreqs_dc44); // Gradients
+  
+  Matrix<var, Dynamic, 1> retval(N);
+  
+  vari** params = ChainableStack::memalloc_.alloc_array<vari *>(3);
+  
+  params[0] = c11.vi_;
+  params[1] = anisotropic.vi_;
+  params[2] = c44.vi_;
+  
+  for(int i = 0; i < N; i++) {
+    double* gradients = ChainableStack::memalloc_.alloc_array<double>(3);
     
-    inline Matrix<var, Dynamic, 1> mech(int N, const dpT& dp, const pvT& pv,
-                                        const var& c11, const var& anisotropic, const var& c44) {
-
-      Matrix<double, Dynamic, 1> freqs(N),
-        dfreqs_dc11(N),
-        dfreqs_da(N),
-        dfreqs_dc44(N);
-      
-      mechanics(c11.vi_->val_, anisotropic.vi_->val_, c44.vi_->val_, // Params
-                dp, pv, N, // Ref data
-                freqs, // Output
-                dfreqs_dc11, dfreqs_da, dfreqs_dc44); // Gradients
-
-      Matrix<var, Dynamic, 1> retval(N);
-
-      vari** params = ChainableStack::memalloc_.alloc_array<vari *>(3);
-
-      params[0] = c11.vi_;
-      params[1] = anisotropic.vi_;
-      params[2] = c44.vi_;
-      
-      for(int i = 0; i < N; i++) {
-        double* gradients = ChainableStack::memalloc_.alloc_array<double>(3);
+    gradients[0] = dfreqs_dc11(i);
+    gradients[1] = dfreqs_da(i);
+    gradients[2] = dfreqs_dc44(i);
         
-        gradients[0] = dfreqs_dc11(i);
-        gradients[1] = dfreqs_da(i);
-        gradients[2] = dfreqs_dc44(i);
-        
-        retval(i) = var(new precomputed(3, params, freqs(i), gradients));
-      }
-
-      return retval;
-    }
+    retval(i) = var(new stored_gradient_vari(freqs(i), 3, params, gradients));
   }
+  
+  return retval;
 }
 
 double tol = 1e-4;
