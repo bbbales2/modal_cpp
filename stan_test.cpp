@@ -25,8 +25,10 @@ pvT pv;
 using namespace Eigen;
 using namespace stan::math;
 
-inline Matrix<var, Dynamic, 1> mech(int N, const dpT& dp, const pvT& pv,
-                                    const var& c11, const var& anisotropic, const var& c44) {
+// Stan function
+
+inline Matrix<var, Dynamic, 1> mech(int N, const dpT& dp, const pvT& pv, // Constant data
+                                    const var& c11, const var& anisotropic, const var& c44) { // Parameters
 
   Matrix<double, Dynamic, 1> freqs(N),
     dfreqs_dc11(N),
@@ -45,7 +47,7 @@ inline Matrix<var, Dynamic, 1> mech(int N, const dpT& dp, const pvT& pv,
   params[0] = c11.vi_;
   params[1] = anisotropic.vi_;
   params[2] = c44.vi_;
-  
+
   for(int i = 0; i < N; i++) {
     double* gradients = ChainableStack::memalloc_.alloc_array<double>(3);
     
