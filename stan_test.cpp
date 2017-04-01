@@ -7,6 +7,7 @@
 #include "util.hpp"
 #include "polybasis.hpp"
 #include "mechanics.hpp"
+#include "stan_mech.hpp"
 
 const double X = 0.007753,
   Y = 0.009057,
@@ -24,42 +25,6 @@ pvT pv;
 
 using namespace Eigen;
 using namespace stan::math;
-
-// Stan function
-
-inline Matrix<var, Dynamic, 1> mech(int N, const dpT& dp, const pvT& pv, // Constant data
-                                    const var& c11, const var& anisotropic, const var& c44) { // Parameters
-
-  Matrix<double, Dynamic, 1> freqs(N),
-    dfreqs_dc11(N),
-    dfreqs_da(N),
-    dfreqs_dc44(N);
-  
-  mechanics(c11.vi_->val_, anisotropic.vi_->val_, c44.vi_->val_, // Params
-            dp, pv, N, // Ref data
-            freqs, // Output
-            dfreqs_dc11, dfreqs_da, dfreqs_dc44); // Gradients
-  
-  Matrix<var, Dynamic, 1> retval(N);
-  
-  vari** params = ChainableStack::memalloc_.alloc_array<vari *>(3);
-  
-  params[0] = c11.vi_;
-  params[1] = anisotropic.vi_;
-  params[2] = c44.vi_;
-
-  for(int i = 0; i < N; i++) {
-    double* gradients = ChainableStack::memalloc_.alloc_array<double>(3);
-    
-    gradients[0] = dfreqs_dc11(i);
-    gradients[1] = dfreqs_da(i);
-    gradients[2] = dfreqs_dc44(i);
-        
-    retval(i) = var(new stored_gradient_vari(freqs(i), 3, params, gradients));
-  }
-  
-  return retval;
-}
 
 double tol = 1e-4;
 
@@ -80,10 +45,10 @@ int main() {
 
   double delta = 0.00001;
 
-  auto v1 = mech(N, dp, pv, c11, a, c44);
-  auto v2 = mech(N, dp, pv, c11 + delta, a, c44);
-  auto v3 = mech(N, dp, pv, c11, a + delta, c44);
-  auto v4 = mech(N, dp, pv, c11, a, c44 + delta);
+  auto v1 = test_model_namespace::mech(N, dp, pv, c11, a, c44, NULL);
+  auto v2 = test_model_namespace::mech(N, dp, pv, c11 + delta, a, c44, NULL);
+  auto v3 = test_model_namespace::mech(N, dp, pv, c11, a + delta, c44, NULL);
+  auto v4 = test_model_namespace::mech(N, dp, pv, c11, a, c44 + delta, NULL);
 
   VectorXd ref(N);
 

@@ -1,7 +1,7 @@
-CPPFLAGS=-fopenmp -I/home/bbales2/stan_math/lib/boost_1.62.0 -I/home/bbales2/stan_math/lib/eigen_3.2.9/ -I/home/bbales2/stan_math/ -I/home/bbales2/stan_math/lib/cvodes_2.9.0/include --std=c++11 -g -O2 -msse
+CPPFLAGS=-fopenmp -I/home/bbales2/stan_math/lib/boost_1.62.0 -I/home/bbales2/stan_math/lib/eigen_3.2.9/ -I/home/bbales2/stan_math/ -I/home/bbales2/stan_math/lib/cvodes_2.9.0/include --std=c++11 -O2 -g -msse
 LFLAGS=-llapack -fopenmp
 DEPS=util.hpp mechanics.hpp polybasis.hpp
-SOURCES=main.cpp unit_tests1.cpp unit_tests2.cpp stan_test.cpp
+SOURCES=main.cpp unit_tests1.cpp unit_tests2.cpp stan_test.cpp stan_input_gen.cpp
 CC=g++
 #clang++
 
@@ -30,6 +30,9 @@ unit_tests2: unit_tests2.o
 	$(CC) $< $(LFLAGS) -o $@
 
 stan_test: stan_test.o
+	$(CC) $< $(LFLAGS) -o $@
+
+stan_input_gen: stan_input_gen.o
 	$(CC) $< $(LFLAGS) -o $@
 
 clean:

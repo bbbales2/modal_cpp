@@ -1,6 +1,7 @@
 #ifndef polybasis_hpp_
 #define polybasis_hpp_
 
+#include <vector>
 #include <cmath>
 #include <Eigen/Core>
 
@@ -24,8 +25,8 @@ double polyint(int n, int m, int l)
   return 2.0 * pow(0.5, l + 1) * ytmp / ((n + 1) * (m + 1) * (l + 1));
 }
 
-typedef Matrix< Matrix<double, 3, 3>, Dynamic, Dynamic > dpT;
-typedef MatrixXd pvT;
+typedef Matrix<double, Dynamic, 1> dpT;
+typedef Matrix<double, Dynamic, Dynamic> pvT;
 
 void buildBasis(int N, double X, double Y, double Z, double density, dpT& dp, pvT& pv) {
   std::vector<int> ns, ms, ls;
@@ -39,7 +40,8 @@ void buildBasis(int N, double X, double Y, double Z, double density, dpT& dp, pv
           ls.push_back(k);
         }
 
-  dp.resize(ns.size(), ns.size());
+  dp.resize(ns.size() * ns.size() * 3 * 3);
+  
   pv.resize(ns.size(), ns.size());
 
   std::vector<double> Xs(2 * N + 3, 0.0),
@@ -62,17 +64,19 @@ void buildBasis(int N, double X, double Y, double Z, double density, dpT& dp, pv
         m1 = ms[j],
         l1 = ls[j];
 
-      dp(i, j)(0, 0) = Xs[n1 + n0] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 2, m1 + m0, l1 + l0) * n0 * n1;
-      dp(i, j)(0, 1) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 1, m1 + m0 - 1, l1 + l0) * n0 * m1;
-      dp(i, j)(0, 2) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 1] * polyint(n1 + n0 - 1, m1 + m0, l1 + l0 - 1) * n0 * l1;
+      Map< Matrix<double, 3, 3> > dpm(&dp[i * 3 * 3 + j * ns.size() * 3 * 3]);
 
-      dp(i, j)(1, 0) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 1, m1 + m0 - 1, l1 + l0) * m0 * n1;
-      dp(i, j)(1, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0 - 2, l1 + l0) * m0 * m1;
-      dp(i, j)(1, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * m0 * l1;
+      dpm(0, 0) = Xs[n1 + n0] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 2, m1 + m0, l1 + l0) * n0 * n1;
+      dpm(0, 1) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 1, m1 + m0 - 1, l1 + l0) * n0 * m1;
+      dpm(0, 2) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 1] * polyint(n1 + n0 - 1, m1 + m0, l1 + l0 - 1) * n0 * l1;
 
-      dp(i, j)(2, 0) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 1] * polyint(n1 + n0 - 1, m1 + m0, l1 + l0 - 1) * l0 * n1;
-      dp(i, j)(2, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * l0 * m1;
-      dp(i, j)(2, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 ] * polyint(n1 + n0, m1 + m0, l1 + l0 - 2) * l0 * l1;
+      dpm(1, 0) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 1, m1 + m0 - 1, l1 + l0) * m0 * n1;
+      dpm(1, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0 - 2, l1 + l0) * m0 * m1;
+      dpm(1, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * m0 * l1;
+
+      dpm(2, 0) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 1] * polyint(n1 + n0 - 1, m1 + m0, l1 + l0 - 1) * l0 * n1;
+      dpm(2, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * l0 * m1;
+      dpm(2, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 ] * polyint(n1 + n0, m1 + m0, l1 + l0 - 2) * l0 * l1;
 
       pv(i, j) = density * Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0, l1 + l0);
     }
@@ -80,108 +84,110 @@ void buildBasis(int N, double X, double Y, double Z, double density, dpT& dp, pv
 }
 
 void buildKM(const MatrixXd& Ch, const dpT& dp, const pvT& pv, MatrixXd& K, MatrixXd& M) {
-  int N = dp.rows();
+  int N = pv.rows();
 
-  dpT C(3, 3);
-  
-  C(0, 0)(0, 0) = Ch(0, 0);
-  C(0, 0)(1, 1) = Ch(0, 1);
-  C(0, 0)(2, 2) = Ch(0, 2);
-  C(0, 0)(1, 2) = Ch(0, 3);
-  C(0, 0)(2, 1) = Ch(0, 3);
-  C(0, 0)(0, 2) = Ch(0, 4);
-  C(0, 0)(2, 0) = Ch(0, 4);
-  C(0, 0)(0, 1) = Ch(0, 5);
-  C(0, 0)(1, 0) = Ch(0, 5);
-  C(1, 1)(0, 0) = Ch(1, 0);
-  C(1, 1)(1, 1) = Ch(1, 1);
-  C(1, 1)(2, 2) = Ch(1, 2);
-  C(1, 1)(1, 2) = Ch(1, 3);
-  C(1, 1)(2, 1) = Ch(1, 3);
-  C(1, 1)(0, 2) = Ch(1, 4);
-  C(1, 1)(2, 0) = Ch(1, 4);
-  C(1, 1)(0, 1) = Ch(1, 5);
-  C(1, 1)(1, 0) = Ch(1, 5);
-  C(2, 2)(0, 0) = Ch(2, 0);
-  C(2, 2)(1, 1) = Ch(2, 1);
-  C(2, 2)(2, 2) = Ch(2, 2);
-  C(2, 2)(1, 2) = Ch(2, 3);
-  C(2, 2)(2, 1) = Ch(2, 3);
-  C(2, 2)(0, 2) = Ch(2, 4);
-  C(2, 2)(2, 0) = Ch(2, 4);
-  C(2, 2)(0, 1) = Ch(2, 5);
-  C(2, 2)(1, 0) = Ch(2, 5);
-  C(1, 2)(0, 0) = Ch(3, 0);
-  C(2, 1)(0, 0) = Ch(3, 0);
-  C(1, 2)(1, 1) = Ch(3, 1);
-  C(2, 1)(1, 1) = Ch(3, 1);
-  C(1, 2)(2, 2) = Ch(3, 2);
-  C(2, 1)(2, 2) = Ch(3, 2);
-  C(1, 2)(1, 2) = Ch(3, 3);
-  C(1, 2)(2, 1) = Ch(3, 3);
-  C(2, 1)(1, 2) = Ch(3, 3);
-  C(2, 1)(2, 1) = Ch(3, 3);
-  C(1, 2)(0, 2) = Ch(3, 4);
-  C(1, 2)(2, 0) = Ch(3, 4);
-  C(2, 1)(0, 2) = Ch(3, 4);
-  C(2, 1)(2, 0) = Ch(3, 4);
-  C(1, 2)(0, 1) = Ch(3, 5);
-  C(1, 2)(1, 0) = Ch(3, 5);
-  C(2, 1)(0, 1) = Ch(3, 5);
-  C(2, 1)(1, 0) = Ch(3, 5);
-  C(0, 2)(0, 0) = Ch(4, 0);
-  C(2, 0)(0, 0) = Ch(4, 0);
-  C(0, 2)(1, 1) = Ch(4, 1);
-  C(2, 0)(1, 1) = Ch(4, 1);
-  C(0, 2)(2, 2) = Ch(4, 2);
-  C(2, 0)(2, 2) = Ch(4, 2);
-  C(0, 2)(1, 2) = Ch(4, 3);
-  C(0, 2)(2, 1) = Ch(4, 3);
-  C(2, 0)(1, 2) = Ch(4, 3);
-  C(2, 0)(2, 1) = Ch(4, 3);
-  C(0, 2)(0, 2) = Ch(4, 4);
-  C(0, 2)(2, 0) = Ch(4, 4);
-  C(2, 0)(0, 2) = Ch(4, 4);
-  C(2, 0)(2, 0) = Ch(4, 4);
-  C(0, 2)(0, 1) = Ch(4, 5);
-  C(0, 2)(1, 0) = Ch(4, 5);
-  C(2, 0)(0, 1) = Ch(4, 5);
-  C(2, 0)(1, 0) = Ch(4, 5);
-  C(0, 1)(0, 0) = Ch(5, 0);
-  C(1, 0)(0, 0) = Ch(5, 0);
-  C(0, 1)(1, 1) = Ch(5, 1);
-  C(1, 0)(1, 1) = Ch(5, 1);
-  C(0, 1)(2, 2) = Ch(5, 2);
-  C(1, 0)(2, 2) = Ch(5, 2);
-  C(0, 1)(1, 2) = Ch(5, 3);
-  C(0, 1)(2, 1) = Ch(5, 3);
-  C(1, 0)(1, 2) = Ch(5, 3);
-  C(1, 0)(2, 1) = Ch(5, 3);
-  C(0, 1)(0, 2) = Ch(5, 4);
-  C(0, 1)(2, 0) = Ch(5, 4);
-  C(1, 0)(0, 2) = Ch(5, 4);
-  C(1, 0)(2, 0) = Ch(5, 4);
-  C(0, 1)(0, 1) = Ch(5, 5);
-  C(0, 1)(1, 0) = Ch(5, 5);
-  C(1, 0)(0, 1) = Ch(5, 5);
-  C(1, 0)(1, 0) = Ch(5, 5);
+  Matrix<double, 9, 9> C;
+
+  C(0 + 0 * 3, 0 + 0 * 3) = Ch(0, 0);
+  C(0 + 0 * 3, 1 + 1 * 3) = Ch(0, 1);
+  C(0 + 0 * 3, 2 + 2 * 3) = Ch(0, 2);
+  C(0 + 0 * 3, 1 + 2 * 3) = Ch(0, 3);
+  C(0 + 0 * 3, 2 + 1 * 3) = Ch(0, 3);
+  C(0 + 0 * 3, 0 + 2 * 3) = Ch(0, 4);
+  C(0 + 0 * 3, 2 + 0 * 3) = Ch(0, 4);
+  C(0 + 0 * 3, 0 + 1 * 3) = Ch(0, 5);
+  C(0 + 0 * 3, 1 + 0 * 3) = Ch(0, 5);
+  C(1 + 1 * 3, 0 + 0 * 3) = Ch(1, 0);
+  C(1 + 1 * 3, 1 + 1 * 3) = Ch(1, 1);
+  C(1 + 1 * 3, 2 + 2 * 3) = Ch(1, 2);
+  C(1 + 1 * 3, 1 + 2 * 3) = Ch(1, 3);
+  C(1 + 1 * 3, 2 + 1 * 3) = Ch(1, 3);
+  C(1 + 1 * 3, 0 + 2 * 3) = Ch(1, 4);
+  C(1 + 1 * 3, 2 + 0 * 3) = Ch(1, 4);
+  C(1 + 1 * 3, 0 + 1 * 3) = Ch(1, 5);
+  C(1 + 1 * 3, 1 + 0 * 3) = Ch(1, 5);
+  C(2 + 2 * 3, 0 + 0 * 3) = Ch(2, 0);
+  C(2 + 2 * 3, 1 + 1 * 3) = Ch(2, 1);
+  C(2 + 2 * 3, 2 + 2 * 3) = Ch(2, 2);
+  C(2 + 2 * 3, 1 + 2 * 3) = Ch(2, 3);
+  C(2 + 2 * 3, 2 + 1 * 3) = Ch(2, 3);
+  C(2 + 2 * 3, 0 + 2 * 3) = Ch(2, 4);
+  C(2 + 2 * 3, 2 + 0 * 3) = Ch(2, 4);
+  C(2 + 2 * 3, 0 + 1 * 3) = Ch(2, 5);
+  C(2 + 2 * 3, 1 + 0 * 3) = Ch(2, 5);
+  C(1 + 2 * 3, 0 + 0 * 3) = Ch(3, 0);
+  C(2 + 1 * 3, 0 + 0 * 3) = Ch(3, 0);
+  C(1 + 2 * 3, 1 + 1 * 3) = Ch(3, 1);
+  C(2 + 1 * 3, 1 + 1 * 3) = Ch(3, 1);
+  C(1 + 2 * 3, 2 + 2 * 3) = Ch(3, 2);
+  C(2 + 1 * 3, 2 + 2 * 3) = Ch(3, 2);
+  C(1 + 2 * 3, 1 + 2 * 3) = Ch(3, 3);
+  C(1 + 2 * 3, 2 + 1 * 3) = Ch(3, 3);
+  C(2 + 1 * 3, 1 + 2 * 3) = Ch(3, 3);
+  C(2 + 1 * 3, 2 + 1 * 3) = Ch(3, 3);
+  C(1 + 2 * 3, 0 + 2 * 3) = Ch(3, 4);
+  C(1 + 2 * 3, 2 + 0 * 3) = Ch(3, 4);
+  C(2 + 1 * 3, 0 + 2 * 3) = Ch(3, 4);
+  C(2 + 1 * 3, 2 + 0 * 3) = Ch(3, 4);
+  C(1 + 2 * 3, 0 + 1 * 3) = Ch(3, 5);
+  C(1 + 2 * 3, 1 + 0 * 3) = Ch(3, 5);
+  C(2 + 1 * 3, 0 + 1 * 3) = Ch(3, 5);
+  C(2 + 1 * 3, 1 + 0 * 3) = Ch(3, 5);
+  C(0 + 2 * 3, 0 + 0 * 3) = Ch(4, 0);
+  C(2 + 0 * 3, 0 + 0 * 3) = Ch(4, 0);
+  C(0 + 2 * 3, 1 + 1 * 3) = Ch(4, 1);
+  C(2 + 0 * 3, 1 + 1 * 3) = Ch(4, 1);
+  C(0 + 2 * 3, 2 + 2 * 3) = Ch(4, 2);
+  C(2 + 0 * 3, 2 + 2 * 3) = Ch(4, 2);
+  C(0 + 2 * 3, 1 + 2 * 3) = Ch(4, 3);
+  C(0 + 2 * 3, 2 + 1 * 3) = Ch(4, 3);
+  C(2 + 0 * 3, 1 + 2 * 3) = Ch(4, 3);
+  C(2 + 0 * 3, 2 + 1 * 3) = Ch(4, 3);
+  C(0 + 2 * 3, 0 + 2 * 3) = Ch(4, 4);
+  C(0 + 2 * 3, 2 + 0 * 3) = Ch(4, 4);
+  C(2 + 0 * 3, 0 + 2 * 3) = Ch(4, 4);
+  C(2 + 0 * 3, 2 + 0 * 3) = Ch(4, 4);
+  C(0 + 2 * 3, 0 + 1 * 3) = Ch(4, 5);
+  C(0 + 2 * 3, 1 + 0 * 3) = Ch(4, 5);
+  C(2 + 0 * 3, 0 + 1 * 3) = Ch(4, 5);
+  C(2 + 0 * 3, 1 + 0 * 3) = Ch(4, 5);
+  C(0 + 1 * 3, 0 + 0 * 3) = Ch(5, 0);
+  C(1 + 0 * 3, 0 + 0 * 3) = Ch(5, 0);
+  C(0 + 1 * 3, 1 + 1 * 3) = Ch(5, 1);
+  C(1 + 0 * 3, 1 + 1 * 3) = Ch(5, 1);
+  C(0 + 1 * 3, 2 + 2 * 3) = Ch(5, 2);
+  C(1 + 0 * 3, 2 + 2 * 3) = Ch(5, 2);
+  C(0 + 1 * 3, 1 + 2 * 3) = Ch(5, 3);
+  C(0 + 1 * 3, 2 + 1 * 3) = Ch(5, 3);
+  C(1 + 0 * 3, 1 + 2 * 3) = Ch(5, 3);
+  C(1 + 0 * 3, 2 + 1 * 3) = Ch(5, 3);
+  C(0 + 1 * 3, 0 + 2 * 3) = Ch(5, 4);
+  C(0 + 1 * 3, 2 + 0 * 3) = Ch(5, 4);
+  C(1 + 0 * 3, 0 + 2 * 3) = Ch(5, 4);
+  C(1 + 0 * 3, 2 + 0 * 3) = Ch(5, 4);
+  C(0 + 1 * 3, 0 + 1 * 3) = Ch(5, 5);
+  C(0 + 1 * 3, 1 + 0 * 3) = Ch(5, 5);
+  C(1 + 0 * 3, 0 + 1 * 3) = Ch(5, 5);
+  C(1 + 0 * 3, 1 + 0 * 3) = Ch(5, 5);
 
   K.resize(N * 3, N * 3);
   K.setZero();
 
   #pragma omp parallel for
   for(int n = 0; n < N; n++)
-    for(int m = 0; m < N; m++)
+    for(int m = 0; m < N; m++) {
+      Map< const Matrix<double, 3, 3> > dpm(&dp[n * 3 * 3 + m * N * 3 * 3]);
       for(int i = 0; i < 3; i++)
         for(int k = 0; k < 3; k++) {
           double total = 0.0;
               
             for(int j = 0; j < 3; j++)
               for(int l = 0; l < 3; l++)
-                total = total + C(i, j)(k, l) * dp(n, m)(j, l);
+                total = total + C(i + 3 * j, k + 3 * l) * dpm(j, l);
 
           K(n * 3 + i, m * 3 + k) = total;
         }
+    }
 
   M.resize(N * 3, N * 3);
   M.setZero();

@@ -157,11 +157,11 @@ void mechanics(double c11, double anisotropic, double c44, //Changing parameters
   
   tmp = omp_get_wtime();
   eigSolve(K, M, 6, 6 + nevs - 1, eigs, evecs);
-
-  int N = K.rows();
   
   if(DEBUG)
     printf("eigSolve %f\n", omp_get_wtime() - tmp);
+
+  int N = K.rows();
   
   freqs.resize(nevs);
 
@@ -171,10 +171,18 @@ void mechanics(double c11, double anisotropic, double c44, //Changing parameters
 
   dfreqs_dc44.resize(nevs);
 
+  tmp = omp_get_wtime();
+  MatrixXd dKdc11_evec = dKdc11 * evecs;
+  MatrixXd dKda_evec = dKda * evecs;
+  MatrixXd dKdc44_evec = dKdc44 * evecs;
+
   for(int i = 0; i < eigs.rows(); i++) {
-    dfreqs_dc11(i, 0) = (evecs.block(0, i, N, 1).transpose() * dKdc11 * evecs.block(0, i, N, 1))(0, 0);
-    dfreqs_da(i, 0) = (evecs.block(0, i, N, 1).transpose() * dKda * evecs.block(0, i, N, 1))(0, 0);
-    dfreqs_dc44(i, 0) = (evecs.block(0, i, N, 1).transpose() * dKdc44 * evecs.block(0, i, N, 1))(0, 0);
+    VectorXd evec = evecs.block(0, i, N, 1).eval();
+    RowVectorXd evecT = evec.transpose().eval();
+
+    dfreqs_dc11(i, 0) = (evecT * dKdc11_evec.block(0, i, N, 1))(0, 0);
+    dfreqs_da(i, 0) = (evecT * dKda_evec.block(0, i, N, 1))(0, 0);
+    dfreqs_dc44(i, 0) = (evecT * dKdc44_evec.block(0, i, N, 1))(0, 0);
   }
 
   for(int i = 0; i < eigs.rows(); i++) {
@@ -185,6 +193,9 @@ void mechanics(double c11, double anisotropic, double c44, //Changing parameters
     dfreqs_da(i, 0) *= dfde;
     dfreqs_dc44(i, 0) *= dfde;
   }
+  
+  if(DEBUG)
+    printf("Output prep: %f\n", omp_get_wtime() - tmp);
 }
 
 #endif
