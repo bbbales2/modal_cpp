@@ -6,7 +6,7 @@
 //typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
 //typedef Eigen::Array<double, Eigen::Dynamic, Eigen::Dynamic> ArrayXd;
 //typedef Eigen::Vec
-#define DEBUG true
+#define DEBUG false
 
 #endif
 

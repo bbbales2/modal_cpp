@@ -26,7 +26,8 @@ pvT pv;
 using namespace Eigen;
 using namespace stan::math;
 
-double tol = 1e-4;
+double tol = 1e-5;
+double fdtol = 1e-3;
 
 int main() {
   data << 109.076, 136.503, 144.899, 184.926, 188.476, 195.562,
@@ -39,19 +40,24 @@ int main() {
 
   Matrix<var, Dynamic, 1> vec(3);
 
+  Matrix<var, Dynamic, Dynamic> C(6, 6);
+
   var c11 = 1.6,
     a = 1.0,
     c44 = 0.446;
 
-  Matrix<var, Dynamic, 1> q(4);
-  q << 0.5, 0.5, 0.5, 0.5;
+  var c12 = -(c44 * 2.0 / a - c11);
+
+  C << c11, c12, c12, 0.0, 0.0, 0.0,
+    c12, c11, c12, 0.0, 0.0, 0.0,
+    c12, c12, c11, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, c44, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, c44, 0.708,
+    0.0, 0.0, 0.0, 0.0, 0.708, c44;
 
   double delta = 0.00001;
 
-  auto v1 = test_model_namespace::mech(N, dp, pv, c11, a, c44, NULL);
-  auto v2 = test_model_namespace::mech(N, dp, pv, c11 + delta, a, c44, NULL);
-  auto v3 = test_model_namespace::mech(N, dp, pv, c11, a + delta, c44, NULL);
-  auto v4 = test_model_namespace::mech(N, dp, pv, c11, a, c44 + delta, NULL);
+  auto v1 = test_model_namespace::mech(N, dp, pv, C, NULL);
 
   VectorXd ref(N);
 
@@ -79,38 +85,48 @@ int main() {
   else
     std::cout << "Passed freq check" << std::endl;
 
-  failed = false;
-  
-  for(int i = 0; i < N; i++) {
-    if(i > 0)
-      set_zero_all_adjoints();
-    
-    v1(i).grad();
+  int ij = 0;
+  for(int i = 0; i < 6; i++) {
+    for(int j = 0; j < i + 1; j++) {
+      Matrix<var, Dynamic, Dynamic> Ct = C;
 
-    /*std::cout << c11.adj() << " " << (v2(i) - v1(i)) / delta << " " << abs((c11.adj() - (v2(i) - v1(i)) / delta) / c11.adj()) << std::endl << std::endl;
-    std::cout << a.adj() << " " << (v3(i) - v1(i)) / delta << " " << abs((a.adj() - (v3(i) - v1(i)) / delta) / a.adj()) << std::endl << std::endl;
-    std::cout << c44.adj() << " " << (v4(i) - v1(i)) / delta << " " << abs((c44.adj() - (v4(i) - v1(i)) / delta) / c44.adj()) << std::endl << std::endl;*/
-    
-    if(abs((c11.adj() - (v2(i) - v1(i)) / delta) / c11.adj()) > tol) {
-      failed = true;
-      break;
-    }
+      Ct(i, j) = C(i, j) + delta;
+      Ct(j, i) = Ct(i, j);
 
-    if(abs((a.adj() - (v3(i) - v1(i)) / delta) / a.adj()) > tol) {
-      failed = true;
-      break;
-    }
+      //std::cout << Ct << std::endl << "--" << std::endl;
+      //std::cout << C << std::endl << "**" << std::endl;
 
-    if(abs((c44.adj() - (v4(i) - v1(i)) / delta) / c44.adj()) > tol) {
-      failed = true;
-      break;
+      auto v2 = test_model_namespace::mech(N, dp, pv, Ct, NULL);
+      
+      failed = false;
+      
+      for(int n = 0; n < N; n++) {
+        set_zero_all_adjoints();
+        
+        v2(n).grad();
+
+        var rel = abs((Ct(i, j).adj() - (v2(n) - v1(n)) / delta) / Ct(i, j).adj());
+        
+        if(rel > fdtol) {
+          failed = true;
+
+          //std::cout << Ct(i, j).adj() << " " << (v2(n) - v1(n)) / delta << std::endl;
+          //std::cout << rel << " " << fdtol << std::endl;
+          
+          break;
+        }
+      }
+
+      if(failed)
+        std::cout << "Failed fd gradient check (" << i << ", " << j << ")" << std::endl;
+      else
+        std::cout << "Passed fd gradient check (" << i << ", " << j << ")" << std::endl;
+
+      //std::cout << "========" << std::endl;
+
+      ij++;
     }
   }
-
-  if(failed)
-    std::cout << "Failed fd gradient check" << std::endl;
-  else
-    std::cout << "Passed fd gradient check" << std::endl;
 
   failed = false;
 
