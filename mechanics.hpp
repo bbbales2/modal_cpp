@@ -198,4 +198,138 @@ void mechanics(double c11, double anisotropic, double c44, //Changing parameters
     printf("Output prep: %f\n", omp_get_wtime() - tmp);
 }
 
+void mechanics_r(double c11, double anisotropic, double c44, //Changing parameters
+                 double w, double x, double y, double z,
+                 const dpT& dp, const pvT& pv, unsigned int nevs, // Constants
+                 VectorXd& freqs,  // Output
+                 VectorXd& dfreqs_dc11,
+                 VectorXd& dfreqs_da,
+                 VectorXd& dfreqs_dc44,
+                 VectorXd& dfreqs_dw,
+                 VectorXd& dfreqs_dx,
+                 VectorXd& dfreqs_dy,
+                 VectorXd& dfreqs_dz) { // Derivatives
+  double c12 = -(c44 * 2.0 / anisotropic - c11);
+
+  Matrix<double, 6, 6> C;
+
+  C << c11, c12, c12, 0, 0, 0,
+    c12, c11, c12, 0, 0, 0,
+    c12, c12, c11, 0, 0, 0,
+    0, 0, 0, c44, 0, 0,
+    0, 0, 0, 0, c44, 0,
+    0, 0, 0, 0, 0, c44;
+
+  Matrix<double, 6, 6> dCdc11;
+
+  dCdc11 << 1.0, 1.0, 1.0, 0, 0, 0,
+    1.0, 1.0, 1.0, 0, 0, 0,
+    1.0, 1.0, 1.0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0;
+  
+  Matrix<double, 6, 6> dCda;
+
+  double dc12da = c44 * 2.0 / (anisotropic * anisotropic);
+
+  dCda << 0.0, dc12da, dc12da, 0, 0, 0,
+    dc12da, 0.0, dc12da, 0, 0, 0,
+    dc12da, dc12da, 0.0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0;
+
+  Matrix<double, 6, 6> dCdc44;
+
+  double dc12dc44 = -2.0 / anisotropic;
+
+  dCdc44 << 0, dc12dc44, dc12dc44, 0, 0, 0,
+    dc12dc44, 0, dc12dc44, 0, 0, 0,
+    dc12dc44, dc12dc44, 0, 0, 0, 0,
+    0, 0, 0, 1.0, 0, 0,
+    0, 0, 0, 0, 1.0, 0,
+    0, 0, 0, 0, 0, 1.0;
+
+  Matrix<double, 3, 3> Q;
+  Matrix<double, 6, 6> Cr, dCrdw, dCrdx, dCrdy, dCrdz;
+  MatrixXd K, M, _;
+  MatrixXd dKdc11, dKda, dKdc44, dKdw, dKdx, dKdy, dKdz;
+
+  double tmp = omp_get_wtime();
+  buildRotate(C, w, x, y, z, Cr, dCrdw, dCrdx, dCrdy, dCrdz, Q);
+  dCdc11 = rotate(dCdc11, Q);
+  dCda = rotate(dCda, Q);
+  dCdc44 = rotate(dCdc44, Q);
+  buildKM(Cr, dp, pv, K, M);
+  buildKM(dCdc11, dp, pv, dKdc11, _);
+  buildKM(dCda, dp, pv, dKda, _);
+  buildKM(dCdc44, dp, pv, dKdc44, _);
+  buildKM(dCrdw, dp, pv, dKdw, _);
+  buildKM(dCrdx, dp, pv, dKdx, _);
+  buildKM(dCrdy, dp, pv, dKdy, _);
+  buildKM(dCrdz, dp, pv, dKdz, _);
+
+  if(DEBUG)
+    printf("buildKM %f\n", omp_get_wtime() - tmp);
+
+  VectorXd eigs;
+  MatrixXd evecs;
+  
+  tmp = omp_get_wtime();
+  eigSolve(K, M, 6, 6 + nevs - 1, eigs, evecs);
+  
+  if(DEBUG)
+    printf("eigSolve %f\n", omp_get_wtime() - tmp);
+
+  int N = K.rows();
+  
+  freqs.resize(nevs);
+  dfreqs_dc11.resize(nevs);
+  dfreqs_da.resize(nevs);
+  dfreqs_dc44.resize(nevs);
+  dfreqs_dw.resize(nevs);
+  dfreqs_dx.resize(nevs);
+  dfreqs_dy.resize(nevs);
+  dfreqs_dz.resize(nevs);
+
+  tmp = omp_get_wtime();
+  MatrixXd dKdc11_evec = dKdc11 * evecs;
+  MatrixXd dKda_evec = dKda * evecs;
+  MatrixXd dKdc44_evec = dKdc44 * evecs;
+  MatrixXd dKdw_evec = dKdw * evecs;
+  MatrixXd dKdx_evec = dKdx * evecs;
+  MatrixXd dKdy_evec = dKdy * evecs;
+  MatrixXd dKdz_evec = dKdz * evecs;
+
+  for(int i = 0; i < eigs.rows(); i++) {
+    VectorXd evec = evecs.block(0, i, N, 1).eval();
+    RowVectorXd evecT = evec.transpose().eval();
+
+    dfreqs_dc11(i) = (evecT * dKdc11_evec.block(0, i, N, 1))(0, 0);
+    dfreqs_da(i) = (evecT * dKda_evec.block(0, i, N, 1))(0, 0);
+    dfreqs_dc44(i) = (evecT * dKdc44_evec.block(0, i, N, 1))(0, 0);
+    dfreqs_dw(i) = (evecT * dKdw_evec.block(0, i, N, 1))(0, 0);
+    dfreqs_dx(i) = (evecT * dKdx_evec.block(0, i, N, 1))(0, 0);
+    dfreqs_dy(i) = (evecT * dKdy_evec.block(0, i, N, 1))(0, 0);
+    dfreqs_dz(i) = (evecT * dKdz_evec.block(0, i, N, 1))(0, 0);
+  }
+
+  for(int i = 0; i < eigs.rows(); i++) {
+    freqs(i, 0) = sqrt(eigs(i, 0) * 1.0e11) / (M_PI * 2000.0);
+    double dfde = 0.5e11 / (sqrt(eigs(i, 0) * 1.0e11) * M_PI * 2000.0);
+
+    dfreqs_dc11(i) *= dfde;
+    dfreqs_da(i) *= dfde;
+    dfreqs_dc44(i) *= dfde;
+    dfreqs_dw(i) *= dfde;
+    dfreqs_dx(i) *= dfde;
+    dfreqs_dy(i) *= dfde;
+    dfreqs_dz(i) *= dfde;
+  }
+  
+  if(DEBUG)
+    printf("Output prep: %f\n", omp_get_wtime() - tmp);
+}
+
 #endif

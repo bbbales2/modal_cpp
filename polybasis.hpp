@@ -83,9 +83,7 @@ void buildBasis(int N, double X, double Y, double Z, double density, dpT& dp, pv
   }
 }
 
-void buildKM(const MatrixXd& Ch, const dpT& dp, const pvT& pv, MatrixXd& K, MatrixXd& M) {
-  int N = pv.rows();
-
+Matrix<double, 9, 9> voigt(const Matrix<double, 6, 6>& Ch) {
   Matrix<double, 9, 9> C;
 
   C(0 + 0 * 3, 0 + 0 * 3) = Ch(0, 0);
@@ -170,8 +168,179 @@ void buildKM(const MatrixXd& Ch, const dpT& dp, const pvT& pv, MatrixXd& K, Matr
   C(1 + 0 * 3, 0 + 1 * 3) = Ch(5, 5);
   C(1 + 0 * 3, 1 + 0 * 3) = Ch(5, 5);
 
+  return C;
+}
+
+Matrix<double, 6, 6> unvoigt(const Matrix<double, 9, 9>& Ch) {
+  Matrix<double, 6, 6> C;
+
+  C(0, 0) = Ch(0 + 0 * 3, 0 + 0 * 3);
+  C(0, 1) = Ch(0 + 0 * 3, 1 + 1 * 3);
+  C(0, 2) = Ch(0 + 0 * 3, 2 + 2 * 3);
+  C(0, 3) = Ch(0 + 0 * 3, 1 + 2 * 3);
+  C(0, 3) = Ch(0 + 0 * 3, 2 + 1 * 3);
+  C(0, 4) = Ch(0 + 0 * 3, 0 + 2 * 3);
+  C(0, 4) = Ch(0 + 0 * 3, 2 + 0 * 3);
+  C(0, 5) = Ch(0 + 0 * 3, 0 + 1 * 3);
+  C(0, 5) = Ch(0 + 0 * 3, 1 + 0 * 3);
+  C(1, 0) = Ch(1 + 1 * 3, 0 + 0 * 3);
+  C(1, 1) = Ch(1 + 1 * 3, 1 + 1 * 3);
+  C(1, 2) = Ch(1 + 1 * 3, 2 + 2 * 3);
+  C(1, 3) = Ch(1 + 1 * 3, 1 + 2 * 3);
+  C(1, 3) = Ch(1 + 1 * 3, 2 + 1 * 3);
+  C(1, 4) = Ch(1 + 1 * 3, 0 + 2 * 3);
+  C(1, 4) = Ch(1 + 1 * 3, 2 + 0 * 3);
+  C(1, 5) = Ch(1 + 1 * 3, 0 + 1 * 3);
+  C(1, 5) = Ch(1 + 1 * 3, 1 + 0 * 3);
+  C(2, 0) = Ch(2 + 2 * 3, 0 + 0 * 3);
+  C(2, 1) = Ch(2 + 2 * 3, 1 + 1 * 3);
+  C(2, 2) = Ch(2 + 2 * 3, 2 + 2 * 3);
+  C(2, 3) = Ch(2 + 2 * 3, 1 + 2 * 3);
+  C(2, 3) = Ch(2 + 2 * 3, 2 + 1 * 3);
+  C(2, 4) = Ch(2 + 2 * 3, 0 + 2 * 3);
+  C(2, 4) = Ch(2 + 2 * 3, 2 + 0 * 3);
+  C(2, 5) = Ch(2 + 2 * 3, 0 + 1 * 3);
+  C(2, 5) = Ch(2 + 2 * 3, 1 + 0 * 3);
+  C(3, 0) = Ch(1 + 2 * 3, 0 + 0 * 3);
+  C(3, 0) = Ch(2 + 1 * 3, 0 + 0 * 3);
+  C(3, 1) = Ch(1 + 2 * 3, 1 + 1 * 3);
+  C(3, 1) = Ch(2 + 1 * 3, 1 + 1 * 3);
+  C(3, 2) = Ch(1 + 2 * 3, 2 + 2 * 3);
+  C(3, 2) = Ch(2 + 1 * 3, 2 + 2 * 3);
+  C(3, 3) = Ch(1 + 2 * 3, 1 + 2 * 3);
+  C(3, 3) = Ch(1 + 2 * 3, 2 + 1 * 3);
+  C(3, 3) = Ch(2 + 1 * 3, 1 + 2 * 3);
+  C(3, 3) = Ch(2 + 1 * 3, 2 + 1 * 3);
+  C(3, 4) = Ch(1 + 2 * 3, 0 + 2 * 3);
+  C(3, 4) = Ch(1 + 2 * 3, 2 + 0 * 3);
+  C(3, 4) = Ch(2 + 1 * 3, 0 + 2 * 3);
+  C(3, 4) = Ch(2 + 1 * 3, 2 + 0 * 3);
+  C(3, 5) = Ch(1 + 2 * 3, 0 + 1 * 3);
+  C(3, 5) = Ch(1 + 2 * 3, 1 + 0 * 3);
+  C(3, 5) = Ch(2 + 1 * 3, 0 + 1 * 3);
+  C(3, 5) = Ch(2 + 1 * 3, 1 + 0 * 3);
+  C(4, 0) = Ch(0 + 2 * 3, 0 + 0 * 3);
+  C(4, 0) = Ch(2 + 0 * 3, 0 + 0 * 3);
+  C(4, 1) = Ch(0 + 2 * 3, 1 + 1 * 3);
+  C(4, 1) = Ch(2 + 0 * 3, 1 + 1 * 3);
+  C(4, 2) = Ch(0 + 2 * 3, 2 + 2 * 3);
+  C(4, 2) = Ch(2 + 0 * 3, 2 + 2 * 3);
+  C(4, 3) = Ch(0 + 2 * 3, 1 + 2 * 3);
+  C(4, 3) = Ch(0 + 2 * 3, 2 + 1 * 3);
+  C(4, 3) = Ch(2 + 0 * 3, 1 + 2 * 3);
+  C(4, 3) = Ch(2 + 0 * 3, 2 + 1 * 3);
+  C(4, 4) = Ch(0 + 2 * 3, 0 + 2 * 3);
+  C(4, 4) = Ch(0 + 2 * 3, 2 + 0 * 3);
+  C(4, 4) = Ch(2 + 0 * 3, 0 + 2 * 3);
+  C(4, 4) = Ch(2 + 0 * 3, 2 + 0 * 3);
+  C(4, 5) = Ch(0 + 2 * 3, 0 + 1 * 3);
+  C(4, 5) = Ch(0 + 2 * 3, 1 + 0 * 3);
+  C(4, 5) = Ch(2 + 0 * 3, 0 + 1 * 3);
+  C(4, 5) = Ch(2 + 0 * 3, 1 + 0 * 3);
+  C(5, 0) = Ch(0 + 1 * 3, 0 + 0 * 3);
+  C(5, 0) = Ch(1 + 0 * 3, 0 + 0 * 3);
+  C(5, 1) = Ch(0 + 1 * 3, 1 + 1 * 3);
+  C(5, 1) = Ch(1 + 0 * 3, 1 + 1 * 3);
+  C(5, 2) = Ch(0 + 1 * 3, 2 + 2 * 3);
+  C(5, 2) = Ch(1 + 0 * 3, 2 + 2 * 3);
+  C(5, 3) = Ch(0 + 1 * 3, 1 + 2 * 3);
+  C(5, 3) = Ch(0 + 1 * 3, 2 + 1 * 3);
+  C(5, 3) = Ch(1 + 0 * 3, 1 + 2 * 3);
+  C(5, 3) = Ch(1 + 0 * 3, 2 + 1 * 3);
+  C(5, 4) = Ch(0 + 1 * 3, 0 + 2 * 3);
+  C(5, 4) = Ch(0 + 1 * 3, 2 + 0 * 3);
+  C(5, 4) = Ch(1 + 0 * 3, 0 + 2 * 3);
+  C(5, 4) = Ch(1 + 0 * 3, 2 + 0 * 3);
+  C(5, 5) = Ch(0 + 1 * 3, 0 + 1 * 3);
+  C(5, 5) = Ch(0 + 1 * 3, 1 + 0 * 3);
+  C(5, 5) = Ch(1 + 0 * 3, 0 + 1 * 3);
+  C(5, 5) = Ch(1 + 0 * 3, 1 + 0 * 3);
+
+  return C;
+}
+
+Matrix<double, 6, 6> rotate(const Matrix<double, 6, 6>& Ch, const Matrix<double, 3, 3>& Q) {
+  auto Cv = voigt(Ch);
+  Matrix<double, 9, 9> Cr = Matrix<double, 9, 9>::Zero();
+
+  for(int i = 0; i < 3; i++)
+    for(int j = 0; j < 3; j++)
+      for(int k = 0; k < 3; k++)
+        for(int l = 0; l < 3; l++)
+          for(int p = 0; p < 3; p++)
+            for(int q = 0; q < 3; q++)
+              for(int r = 0; r < 3; r++)
+                for(int s = 0; s < 3; s++)
+                  Cr(i + 3 * j, k + 3 * l) += Q(i, p) * Q(j, q) * Cv(p + 3 * q, r + 3 * s) * Q(k, r) * Q(l, s);
+  
+  return unvoigt(Cr);
+}
+
+Matrix<double, 6, 6> drotate(const Matrix<double, 6, 6>& Ch, const Matrix<double, 3, 3>& Q, const Matrix<double, 3, 3>& dQ) {
+  auto Cv = voigt(Ch);
+  Matrix<double, 9, 9> Cr = Matrix<double, 9, 9>::Zero();
+
+  for(int i = 0; i < 3; i++)
+    for(int j = 0; j < 3; j++)
+      for(int k = 0; k < 3; k++)
+        for(int l = 0; l < 3; l++)
+          for(int p = 0; p < 3; p++)
+            for(int q = 0; q < 3; q++)
+              for(int r = 0; r < 3; r++)
+                for(int s = 0; s < 3; s++) {
+                  Cr(i + 3 * j, k + 3 * l) += dQ(i, p) * Q(j, q) * Cv(p + 3 * q, r + 3 * s) * Q(k, r) * Q(l, s) +
+                    Q(i, p) * dQ(j, q) * Cv(p + 3 * q, r + 3 * s) * Q(k, r) * Q(l, s) +
+                    Q(i, p) * Q(j, q) * Cv(p + 3 * q, r + 3 * s) * dQ(k, r) * Q(l, s) +
+                    Q(i, p) * Q(j, q) * Cv(p + 3 * q, r + 3 * s) * Q(k, r) * dQ(l, s);
+                }
+  
+  return unvoigt(Cr);
+}
+
+void buildRotate(const Matrix<double, 6, 6>& Ch, double w, double x, double y, double z,
+                 Matrix<double, 6, 6>& Cr,
+                 Matrix<double, 6, 6>& dCrdw,
+                 Matrix<double, 6, 6>& dCrdx,
+                 Matrix<double, 6, 6>& dCrdy,
+                 Matrix<double, 6, 6>& dCrdz,
+                 Matrix<double, 3, 3>& Q) {
+  // Code adapted from Will Lenthe
+  Matrix<double, 3, 3> dQdw, dQdx, dQdy, dQdz;
+  
+  Q << w * w - (y * y + z * z) + x * x, 2.0 * (x * y - w * z), 2.0 * (x * z + w * y),
+    2.0 * (y * x + w * z), w * w - (x * x + z * z) + y * y, 2.0 * (y * z - w * x),
+    2.0 * (z * x - w * y), 2.0 * (z * y + w * x), w * w - (x * x + y * y) + z * z;
+
+  dQdw << 2 * w, -2.0 * z, 2.0 * y,
+    2.0 * z, 2 * w, -2.0 * x,
+    -2.0 * y, 2.0 * x, 2 * w;
+  
+  dQdx << 2 * x, 2.0 * y, 2.0 * z,
+    2.0 * y, -2.0 * x, -2.0 * w,
+    2.0 * z, 2.0 * w, -2.0 * x;
+
+  dQdy << -2 * y, 2 * x, 2 * w,
+    2 * x, 2 * y, 2 * z,
+    -2 * w, 2 * z, -2 * y;
+
+  dQdz << -2 * z, -2 * w, 2 * x,
+    2 * w, -2 * z, 2 * y,
+    2 * x, 2 * y, 2 * z;
+
+  Cr = rotate(Ch, Q);
+  dCrdw = drotate(Ch, Q, dQdw);
+  dCrdx = drotate(Ch, Q, dQdx);
+  dCrdy = drotate(Ch, Q, dQdy);
+  dCrdz = drotate(Ch, Q, dQdz);
+}
+
+void buildKM(const Matrix<double, 6, 6>& Ch, const dpT& dp, const pvT& pv, MatrixXd& K, MatrixXd& M) {
+  int N = pv.rows();
+
   K.resize(N * 3, N * 3);
   K.setZero();
+
+  auto C = voigt(Ch);
 
   #pragma omp parallel for
   for(int n = 0; n < N; n++)

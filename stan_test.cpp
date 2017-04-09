@@ -43,6 +43,9 @@ int main() {
     a = 1.0,
     c44 = 0.446;
 
+  Matrix<var, Dynamic, 1> q(4);
+  q << 0.5, 0.5, 0.5, 0.5;
+
   double delta = 0.00001;
 
   auto v1 = test_model_namespace::mech(N, dp, pv, c11, a, c44, NULL);

@@ -90,4 +90,59 @@ namespace test_model_namespace {
     
     return retval;
   }
+
+  inline Matrix<var, Dynamic, 1>
+  mechr(const int& N, const dpT& dp, const pvT& pv, // Constant data
+        const var& c11, const var& anisotropic, const var& c44, // Parameters
+        const var& w, const var& x, const var& y, const var& z,
+        std::ostream *stream) {
+
+    Matrix<double, Dynamic, 1> freqs,
+      dfreqs_dc11,
+      dfreqs_da,
+      dfreqs_dc44,
+      dfreqs_dw,
+      dfreqs_dx,
+      dfreqs_dy,
+      dfreqs_dz;
+
+    double tmp = omp_get_wtime();
+    mechanicsr(c11.vi_->val_, anisotropic.vi_->val_, c44.vi_->val_, // Params
+               w.vi_->val_, x.vi_->val_, y.vi_->val_, z.vi_->val_,
+               dp, pv, N, // Ref data
+               freqs, // Output
+               dfreqs_dc11, dfreqs_da, dfreqs_dc44,
+               dfreqs_dw, dfreqs_dx, dfreqs_dy, dfreqs_dz); // Gradients
+
+    //if(stream)
+    //  (*stream) << omp_get_wtime() - tmp << " " << c11.vi_->val_ << " " << anisotropic.vi_->val_ << " " << c44.vi_->val_ << std::endl;
+  
+    Matrix<var, Dynamic, 1> retval(N);
+  
+    vari** params = ChainableStack::memalloc_.alloc_array<vari *>(7);
+  
+    params[0] = c11.vi_;
+    params[1] = anisotropic.vi_;
+    params[2] = c44.vi_;
+    params[3] = w.vi_;
+    params[4] = x.vi_;
+    params[5] = y.vi_;
+    params[6] = z.vi_;
+
+    for(int i = 0; i < N; i++) {
+      double* gradients = ChainableStack::memalloc_.alloc_array<double>(7);
+    
+      gradients[0] = dfreqs_dc11(i);
+      gradients[1] = dfreqs_da(i);
+      gradients[2] = dfreqs_dc44(i);
+      gradients[3] = dfreqs_dw(i);
+      gradients[4] = dfreqs_dx(i);
+      gradients[5] = dfreqs_dy(i);
+      gradients[6] = dfreqs_dz(i);
+        
+      retval(i) = var(new stored_gradient_vari(freqs(i), 7, params, gradients));
+    }
+  
+    return retval;
+  }
 }
