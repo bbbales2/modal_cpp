@@ -198,7 +198,7 @@ void mechanics(double c11, double anisotropic, double c44, //Changing parameters
     printf("Output prep: %f\n", omp_get_wtime() - tmp);
 }
 
-void mechanics_r(double c11, double anisotropic, double c44, //Changing parameters
+void mechanicsr(double c11, double anisotropic, double c44, //Changing parameters
                  double w, double x, double y, double z,
                  const dpT& dp, const pvT& pv, unsigned int nevs, // Constants
                  VectorXd& freqs,  // Output
