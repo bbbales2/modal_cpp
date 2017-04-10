@@ -20,8 +20,8 @@ int P = 10;
 int N = 30;
 ArrayXd data(N, 1);
 
-dpT dp;
-pvT pv;
+Matrix<double, Dynamic, 1> lookup;
+int L;
 
 using namespace Eigen;
 using namespace stan::math;
@@ -36,7 +36,7 @@ int main() {
     288.796, 296.976, 301.101, 303.024, 305.115, 305.827,
     306.939, 310.428, 318.   , 319.457, 322.249, 323.464;
 
-  buildBasis(P, X, Y, Z, density, dp, pv);
+  buildBasis(P, X, Y, Z, density, lookup, L);
 
   Matrix<var, Dynamic, 1> vec(3);
 
@@ -57,7 +57,7 @@ int main() {
 
   double delta = 0.00001;
 
-  auto v1 = test_model_namespace::mech(N, dp, pv, C, NULL);
+  auto v1 = test_model_namespace::mech(N, lookup, L, C, NULL);
 
   VectorXd ref(N);
 

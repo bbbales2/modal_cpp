@@ -8,6 +8,7 @@
 #include "util.hpp"
 #include "polybasis.hpp"
 #include "mechanics.hpp"
+#include "stan_mech.hpp"
 
 const double X = 0.007753,
   Y = 0.009057,

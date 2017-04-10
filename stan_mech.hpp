@@ -37,19 +37,21 @@ namespace test_model_namespace {
       for(int j = 0; j < 3; j++)
         K(i, j + 3) *= 2.0;
 
+    //std::cout << C << std::endl << std::endl;
+    //std::cout << K << std::endl << std::endl;
+    
     return K * C * K.transpose();
   }
   
-  template <typename T1__, typename T2__, typename T3__>
-  Eigen::Matrix<typename boost::math::tools::promote_args<T1__, T2__, T3__>::type, Eigen::Dynamic,1>
+  template <typename T1__, typename T2__>
+  Eigen::Matrix<typename boost::math::tools::promote_args<T1__, T2__>::type, Eigen::Dynamic,1>
   mech(const int& N,
-       const Eigen::Matrix<T1__, Eigen::Dynamic, 1>& dp,
-       const Eigen::Matrix<T2__, Eigen::Dynamic, Eigen::Dynamic>& pv,
-       const Eigen::Matrix<T3__, Eigen::Dynamic, Eigen::Dynamic>& C, std::ostream* pstream__);
+       const Eigen::Matrix<T1__, Eigen::Dynamic, 1>& lookup, const int& L,
+       const Eigen::Matrix<T2__, Eigen::Dynamic, Eigen::Dynamic>& C, std::ostream* pstream__);
   
   template<>
   inline Matrix<var, Dynamic, 1>
-  mech(const int& N, const dpT& dp, const pvT& pv, // Constant data
+  mech(const int& N, const Matrix<double, Dynamic, 1>& lookup, const int& L, // Constant data
        const Matrix<var, Dynamic, Dynamic>& C, // Parameters
        std::ostream *stream) {
 
@@ -68,16 +70,17 @@ namespace test_model_namespace {
     for(int i = 0; i < 6; i++)
       for(int j = 0; j < 6; j++) {
         C_(i, j) = C(i, j).vi_->val_;
-
-        //std::cout << C(j, i) << " " << C(i, j) << std::endl;
-        
-        if(C(i, j) != C(j, i))
-          std::cout << "MATRIX IS NOT POSITIVE DEFINITE" << std::endl;
       }
+
+    //std::cout << C_ << std::endl << std::endl;
+
+    auto llt = C_.llt();
+    if(llt.info() == Eigen::NumericalIssue)
+      throw std::runtime_error("Possibly non semi-positive definitie matrix!");
     
     double tmp = omp_get_wtime();
     mechanics(C_, // Params
-              dp, pv, N, // Ref data
+              lookup, L, N, // Ref data
               freqs, // Output
               dfreqsdCij); // Gradients
 

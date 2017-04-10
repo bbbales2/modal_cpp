@@ -12,3 +12,11 @@ for i in range(6):
         for k, l in voigt[i]:
             for n, m in voigt[j]:
                 print "C({i}, {j}) = Ch({k} + {l} * 3, {n} + {m} * 3);".format(i = i, j = j, k = k, l = l, n = n, m = m)
+
+#%%
+
+idxs = []
+for i in range(6):
+    for j in range(i, 6):
+        print len(idxs), i, j
+        idxs.append((i, j))
