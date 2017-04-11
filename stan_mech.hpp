@@ -3,22 +3,39 @@
 #include <stan/math.hpp>
 
 // Stan function
-namespace test_model_namespace {
+namespace rus_namespace {
 #include "polybasis.hpp"
 #include "mechanics.hpp"
 
   using namespace Eigen;
   using namespace stan::math;
 
-  inline Matrix<var, Dynamic, Dynamic>
-  rotate(const Matrix<var, Dynamic, Dynamic>& C, const Matrix<var, Dynamic, 1>& q) {
-    const var& w = q(0);
-    const var& x = q(1);
-    const var& y = q(2);
-    const var& z = q(3);
+  template <typename T1__, typename T2__, typename T3__, typename T4__>
+  Matrix<typename boost::math::tools::promote_args<T1__, T2__, T3__, T4__>::type, Dynamic, 1>
+  mech_init(const int& P,
+            const T1__& X,
+            const T2__& Y,
+            const T3__& Z,
+            const T4__& density, std::ostream* pstream__) {
+    Matrix<typename boost::math::tools::promote_args<T1__, T2__, T3__, T4__>::type, Dynamic, 1> lookup;
+    int L;
+    
+    buildBasis(P, X, Y, Z, density, lookup, L);
 
-    Matrix<var, 3, 3> Q;
-    Matrix<var, 6, 6> K;
+    return lookup;
+  }
+
+  template <typename T0, typename T1>
+  Matrix<typename boost::math::tools::promote_args<T0, T1>::type, Dynamic, Dynamic>
+  mech_rotate(const Matrix<T0, Dynamic, Dynamic>& C,
+              const Matrix<T1, Dynamic, 1>& q, std::ostream* pstream__) {
+    const T1& w = q(0);
+    const T1& x = q(1);
+    const T1& y = q(2);
+    const T1& z = q(3);
+
+    Matrix<T1, 3, 3> Q;
+    Matrix<T1, 6, 6> K;
 
     Q << w * w - (y * y + z * z) + x * x, 2.0 * (x * y - w * z), 2.0 * (x * z + w * y),
       2.0 * (y * x + w * z), w * w - (x * x + z * z) + y * y, 2.0 * (y * z - w * x),
@@ -36,24 +53,22 @@ namespace test_model_namespace {
     for(int i = 0; i < 3; i++)
       for(int j = 0; j < 3; j++)
         K(i, j + 3) *= 2.0;
-
-    //std::cout << C << std::endl << std::endl;
-    //std::cout << K << std::endl << std::endl;
     
     return K * C * K.transpose();
   }
-  
+
   template <typename T1__, typename T2__>
-  Eigen::Matrix<typename boost::math::tools::promote_args<T1__, T2__>::type, Eigen::Dynamic,1>
-  mech(const int& N,
-       const Eigen::Matrix<T1__, Eigen::Dynamic, 1>& lookup, const int& L,
-       const Eigen::Matrix<T2__, Eigen::Dynamic, Eigen::Dynamic>& C, std::ostream* pstream__);
+  Matrix<typename boost::math::tools::promote_args<T1__, T2__>::type, Dynamic, 1>
+  mech_rus(const int& N,
+       const Matrix<T1__, Dynamic, 1>& lookup,
+       const int& L,
+       const Matrix<T2__, Dynamic, Dynamic>& C, std::ostream* pstream__);
   
   template<>
   inline Matrix<var, Dynamic, 1>
-  mech(const int& N, const Matrix<double, Dynamic, 1>& lookup, const int& L, // Constant data
-       const Matrix<var, Dynamic, Dynamic>& C, // Parameters
-       std::ostream *stream) {
+  mech_rus(const int& N, const Matrix<double, Dynamic, 1>& lookup, const int& L, // Constant data
+           const Matrix<var, Dynamic, Dynamic>& C, // Parameters
+           std::ostream *stream) {
 
     Matrix<double, Dynamic, 1> freqs(N, 1);
 
