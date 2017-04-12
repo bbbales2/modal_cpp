@@ -64,11 +64,11 @@ int main() {
 
   double delta = 0.000001;
 
-  Matrix<var, Dynamic, Dynamic> C = test_model_namespace::rotate(C_, q);
+  Matrix<var, Dynamic, Dynamic> C = rus_namespace::mech_rotate(C_, q, NULL);
 
   std::cout << C << std::endl << std::endl;
   
-  auto v1 = test_model_namespace::mech(N, lookup, L, C, NULL);
+  auto v1 = rus_namespace::mech_rus(N, lookup, L, C, NULL);
 
   VectorXd ref(N);
 
@@ -84,11 +84,10 @@ int main() {
   bool failed = false;
 
   for(int i = 0; i < N; i++) {
-    if(abs(v1(i) - ref(i)) / ref(i) > tol) {
+    if(abs(v1(i) - ref(i)) / ref(i) > tol || std::isnan(v1(i))) {
       failed = true;
       break;
     }
-    //std::cout << v1(i) << " " << ref(i) << std::endl;
   }
 
   if(failed)
@@ -161,9 +160,11 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((c11.adj() - refc11(i)) / c11.adj()) > tol) {
+    std::cout << c11.adj() << " " << refc11(i) << std::endl;
+
+    if(abs((c11.adj() - refc11(i)) / c11.adj()) > tol || std::isnan(c11.adj())) {
       failed = true;
-      break;
+      //break;
     }
   }
 
@@ -192,7 +193,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((w.adj() - refw(i)) / w.adj()) > tol) {
+    if(abs((w.adj() - refw(i)) / w.adj()) > tol || std::isnan(w.adj())) {
       failed = true;
       break;
     }
@@ -223,7 +224,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((x.adj() - refx(i)) / x.adj()) > tol) {
+    if(abs((x.adj() - refx(i)) / x.adj()) > tol || std::isnan(x.adj())) {
       failed = true;
       break;
     }
@@ -254,7 +255,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((y.adj() - refy(i)) / y.adj()) > tol) {
+    if(abs((y.adj() - refy(i)) / y.adj()) > tol || std::isnan(y.adj())) {
       failed = true;
       break;
     }
@@ -285,7 +286,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((z.adj() - refz(i)) / z.adj()) > tol) {
+    if(abs((z.adj() - refz(i)) / z.adj()) > tol || std::isnan(z.adj())) {
       failed = true;
       break;
     }
