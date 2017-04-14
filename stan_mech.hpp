@@ -18,9 +18,8 @@ namespace rus_namespace {
             const T3__& Z,
             const T4__& density, std::ostream* pstream__) {
     Matrix<typename boost::math::tools::promote_args<T1__, T2__, T3__, T4__>::type, Dynamic, 1> lookup;
-    int L;
     
-    buildBasis(P, X, Y, Z, density, lookup, L);
+    buildBasis(P, X, Y, Z, density, lookup);
 
     return lookup;
   }
@@ -61,15 +60,13 @@ namespace rus_namespace {
   Matrix<typename boost::math::tools::promote_args<T1__, T2__>::type, Dynamic, 1>
   mech_rus(const int& N,
        const Matrix<T1__, Dynamic, 1>& lookup,
-       const int& L,
        const Matrix<T2__, Dynamic, Dynamic>& C, std::ostream* pstream__);
   
   template<>
   inline Matrix<var, Dynamic, 1>
-  mech_rus(const int& N, const Matrix<double, Dynamic, 1>& lookup, const int& L, // Constant data
+  mech_rus(const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
            const Matrix<var, Dynamic, Dynamic>& C, // Parameters
            std::ostream *stream) {
-
     Matrix<double, Dynamic, 1> freqs(N, 1);
 
     Matrix<double, Dynamic, 21> dfreqsdCij(N, 21);
@@ -89,13 +86,13 @@ namespace rus_namespace {
 
     //std::cout << C_ << std::endl << std::endl;
 
-    auto llt = C_.llt();
+    LLT< Matrix<double, 6, 6> > llt = C_.llt();
     if(llt.info() == Eigen::NumericalIssue)
       throw std::runtime_error("Possibly non semi-positive definitie matrix!");
     
     double tmp = omp_get_wtime();
     mechanics(C_, // Params
-              lookup, L, N, // Ref data
+              lookup, N, // Ref data
               freqs, // Output
               dfreqsdCij); // Gradients
 
@@ -121,5 +118,42 @@ namespace rus_namespace {
     }
   
     return retval;
+  }
+
+  template<>
+  inline Matrix<double, Dynamic, 1>
+  mech_rus(const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
+           const Matrix<double, Dynamic, Dynamic>& C, // Parameters
+           std::ostream *stream) {
+    Matrix<double, Dynamic, 1> freqs(N, 1);
+
+    Matrix<double, Dynamic, 21> dfreqsdCij(N, 21);
+
+    Matrix<double, 6, 6> C_;
+
+    if(C.rows() != 6)
+      std::cout << "WRONG NUMBER OF ROWS IN COMPLIANCE MATRIX" << std::endl;
+
+    if(C.cols() != 6)
+      std::cout << "WRONG NUMBER OF COLS IN COMPLIANCE MATRIX" << std::endl;
+    
+    for(int i = 0; i < 6; i++)
+      for(int j = 0; j < 6; j++) {
+        C_(i, j) = C(i, j);//.vi_->val_;
+      }
+
+    //std::cout << C_ << std::endl << std::endl;
+
+    LLT< Matrix<double, 6, 6> > llt = C_.llt();
+    if(llt.info() == Eigen::NumericalIssue)
+      throw std::runtime_error("Possibly non semi-positive definitie matrix!");
+    
+    double tmp = omp_get_wtime();
+    mechanics(C_, // Params
+              lookup, N, // Ref data
+              freqs, // Output
+              dfreqsdCij); // Gradients
+
+    return freqs;
   }
 }

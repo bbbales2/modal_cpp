@@ -20,9 +20,6 @@ int P = 10;
 int N = 30;
 ArrayXd data(N, 1);
 
-Matrix<double, Dynamic, 1> lookup;
-int L;
-
 using namespace Eigen;
 using namespace stan::math;
 
@@ -36,7 +33,7 @@ int main() {
     288.796, 296.976, 301.101, 303.024, 305.115, 305.827,
     306.939, 310.428, 318.   , 319.457, 322.249, 323.464;
 
-  buildBasis(P, X, Y, Z, density, lookup, L);
+  Matrix<double, Dynamic, 1> lookup = rus_namespace::mech_init(P, X, Y, Z, density, NULL);
 
   Matrix<var, Dynamic, 1> vec(3);
 
@@ -52,12 +49,12 @@ int main() {
     c12, c11, c12, 0.0, 0.0, 0.0,
     c12, c12, c11, 0.0, 0.0, 0.0,
     0.0, 0.0, 0.0, c44, 0.0, 0.0,
-    0.0, 0.0, 0.0, 0.0, c44, 0.708,
-    0.0, 0.0, 0.0, 0.0, 0.708, c44;
+    0.0, 0.0, 0.0, 0.0, c44, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, c44;
 
   double delta = 0.00001;
 
-  auto v1 = test_model_namespace::mech(N, lookup, L, C, NULL);
+  auto v1 = rus_namespace::mech_rus(N, lookup, C, NULL);
 
   VectorXd ref(N);
 
@@ -96,7 +93,7 @@ int main() {
       //std::cout << Ct << std::endl << "--" << std::endl;
       //std::cout << C << std::endl << "**" << std::endl;
 
-      auto v2 = test_model_namespace::mech(N, dp, pv, Ct, NULL);
+      auto v2 = rus_namespace::mech_rus(N, lookup, Ct, NULL);
       
       failed = false;
       
@@ -110,8 +107,8 @@ int main() {
         if(rel > fdtol) {
           failed = true;
 
-          //std::cout << Ct(i, j).adj() << " " << (v2(n) - v1(n)) / delta << std::endl;
-          //std::cout << rel << " " << fdtol << std::endl;
+          std::cout << Ct(i, j).adj() << " " << (v2(n) - v1(n)) / delta << std::endl;
+          std::cout << rel << " " << fdtol << std::endl;
           
           break;
         }

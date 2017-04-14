@@ -88,29 +88,18 @@ void eigSolve(const MatrixXd &A, const MatrixXd &B, int il, int iu, VectorXd& ei
 //          freqs nev x 1 <-- Matrix of resonance modes (directly comparable to data)
 //          (optional) dfreqs_dc11, dfreqs_da, dfreqs_dc44 nev x 1 <-- Matrices of derivatives of each resonance mode with respect to each parameter
 void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
-               const Matrix<double, Dynamic, 1>& lookup, int L, int nevs, // Constants
+               const Matrix<double, Dynamic, 1>& lookup, int nevs, // Constants
                VectorXd& freqs,  // Output
                Matrix<double, Dynamic, 21>& dfreqsdCij) { // Derivatives
+  int L = int(0.5 + std::sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
+  //int L = round(sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
+
   double tmp = omp_get_wtime();
 
   MatrixXd K, M, _;
   std::vector< MatrixXd > dKdcij(21);
   
-  int ij = 0;
-  for(int i = 0; i < 6; i++) {
-    for(int j = 0; j < i + 1; j++) {
-      Matrix<double, 6, 6> dCdcij = Matrix<double, 6, 6>::Zero();
-        
-      dCdcij(i, j) = 1.0;
-      dCdcij(j, i) = 1.0;
-        
-      buildKM(dCdcij, lookup, L, dKdcij[ij], _);
-
-      ij++;
-    }
-  }
-
-  buildKM(C, lookup, L, K, M);
+  buildKM(C, lookup, K, M);
 
   if(DEBUG)
     printf("buildKM %f\n", omp_get_wtime() - tmp);
@@ -134,7 +123,9 @@ void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
 
   tmp = omp_get_wtime();
   for(int ij = 0; ij < 21; ij++) {
-    dKdcij_evecs[ij] = dKdcij[ij] * evecs;
+    Map< const Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[L * L * 3 * 3 + L * L + ij * L * L * 3 * 3], 3 * L, 3 * L);
+
+    dKdcij_evecs[ij] = dKdcij * evecs;
   }
   
   for(int i = 0; i < nevs; i++) {

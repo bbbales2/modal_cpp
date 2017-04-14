@@ -20,8 +20,6 @@ int P = 10;
 int N = 30;
 ArrayXd data(N, 1);
 
-Matrix<double, Dynamic, 1> lookup;
-int L;
 
 using namespace Eigen;
 using namespace stan::math;
@@ -36,7 +34,7 @@ int main() {
     288.796, 296.976, 301.101, 303.024, 305.115, 305.827,
     306.939, 310.428, 318.   , 319.457, 322.249, 323.464;
 
-  buildBasis(P, X, Y, Z, density, lookup, L);
+  Matrix<double, Dynamic, 1> lookup = rus_namespace::mech_init(P, X, Y, Z, density, NULL);
 
   Matrix<var, Dynamic, 1> vec(3);
 
@@ -64,11 +62,11 @@ int main() {
 
   double delta = 0.000001;
 
-  Matrix<var, Dynamic, Dynamic> C = test_model_namespace::rotate(C_, q);
+  Matrix<var, Dynamic, Dynamic> C = rus_namespace::mech_rotate(C_, q, NULL);
 
-  std::cout << C << std::endl << std::endl;
+  //std::cout << C << std::endl << std::endl;
   
-  auto v1 = test_model_namespace::mech(N, lookup, L, C, NULL);
+  auto v1 = rus_namespace::mech_rus(N, lookup, C, NULL);
 
   VectorXd ref(N);
 

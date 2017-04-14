@@ -100,13 +100,15 @@ Matrix<double, 9, 9> voigt(const Matrix<double, 6, 6>& Ch) {
   return C;
 }
 
-void buildK(const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& lookup, int L, Map< MatrixXd >& K) {
+void buildK(const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& lookup, Map< MatrixXd >& K) {
+  int L = int(0.5 + std::sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
+
   K.resize(L * 3, L * 3);
   K.setZero();
 
   Map< const Matrix<double, Dynamic, 1> > dp(&lookup.data()[0], L * L * 3 * 3);
 
-  auto C = voigt(Ch);
+  Matrix<double, 9, 9> C = voigt(Ch);
 
   #pragma omp parallel for
   for(int n = 0; n < L; n++)
@@ -125,9 +127,11 @@ void buildK(const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& lo
     }
 }
 
-void buildM(const Matrix<double, Dynamic, 1>& lookup, int L, Map< MatrixXd >& M) {
-  Map< const Matrix<double, Dynamic, Dynamic> > pv(&lookup.data()[L * L * 3 * 3], L, L);
+void buildM(const Matrix<double, Dynamic, 1>& lookup, Map< MatrixXd >& M) {
+  int L = int(0.5 + std::sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
 
+  Map< const Matrix<double, Dynamic, Dynamic> > pv(&lookup.data()[L * L * 3 * 3], L, L);
+  
   M.resize(L * 3, L * 3);
   M.setZero();
 
@@ -153,7 +157,7 @@ double polyint(int n, int m, int l)
   return 2.0 * pow(0.5, l + 1) * ytmp / ((n + 1) * (m + 1) * (l + 1));
 }
 
-void buildBasis(int N, double X, double Y, double Z, double density, Matrix<double, Dynamic, 1>& lookup, int& L) {
+void buildBasis(int N, double X, double Y, double Z, double density, Matrix<double, Dynamic, 1>& lookup) {
   std::vector<int> ns, ms, ls;
 
   for(int i = 0; i < N + 1; i++)
@@ -165,7 +169,7 @@ void buildBasis(int N, double X, double Y, double Z, double density, Matrix<doub
           ls.push_back(k);
         }
 
-  L = ns.size();
+  int L = ns.size();
 
   lookup.resize(L * L * 3 * 3 + L * L + L * L * 3 * 3 * 21 + L * L * 3 * 3);
 
@@ -220,7 +224,7 @@ void buildBasis(int N, double X, double Y, double Z, double density, Matrix<doub
       dCdcij(i, j) = 1.0;
       dCdcij(j, i) = 1.0;
         
-      buildK(dCdcij, lookup, L, dKdcij);
+      buildK(dCdcij, lookup, dKdcij);
 
       ij++;
     }
@@ -228,7 +232,7 @@ void buildBasis(int N, double X, double Y, double Z, double density, Matrix<doub
 
   Map< Matrix<double, Dynamic, Dynamic> > M(&lookup.data()[L * L * 3 * 3 + L * L + 21 * L * L * 3 * 3], L * 3, L * 3);
 
-  buildM(lookup, L, M);
+  buildM(lookup, M);
 }
 
 Matrix<double, 6, 6> unvoigt(const Matrix<double, 9, 9>& Ch) {
@@ -320,7 +324,7 @@ Matrix<double, 6, 6> unvoigt(const Matrix<double, 9, 9>& Ch) {
 }
 
 Matrix<double, 6, 6> rotate(const Matrix<double, 6, 6>& Ch, const Matrix<double, 3, 3>& Q) {
-  auto Cv = voigt(Ch);
+  Matrix<double, 9, 9> Cv = voigt(Ch);
   Matrix<double, 9, 9> Cr = Matrix<double, 9, 9>::Zero();
 
   for(int i = 0; i < 3; i++)
@@ -337,7 +341,7 @@ Matrix<double, 6, 6> rotate(const Matrix<double, 6, 6>& Ch, const Matrix<double,
 }
 
 Matrix<double, 6, 6> drotate(const Matrix<double, 6, 6>& Ch, const Matrix<double, 3, 3>& Q, const Matrix<double, 3, 3>& dQ) {
-  auto Cv = voigt(Ch);
+  Matrix<double, 9, 9> Cv = voigt(Ch);
   Matrix<double, 9, 9> Cr = Matrix<double, 9, 9>::Zero();
 
   for(int i = 0; i < 3; i++)
@@ -394,7 +398,9 @@ void buildRotate(const Matrix<double, 6, 6>& Ch, double w, double x, double y, d
   dCrdz = drotate(Ch, Q, dQdz);
 }
 
-void buildKM(const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& lookup, int L, MatrixXd& K_, MatrixXd& M_) {
+void buildKM(const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& lookup, MatrixXd& K_, MatrixXd& M_) {
+  int L = int(0.5 + std::sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
+
   K_.resize(L * 3, L * 3);
   K_.setZero();
   
