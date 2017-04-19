@@ -110,7 +110,7 @@ void buildK(const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& lo
 
   Matrix<double, 9, 9> C = voigt(Ch);
 
-  #pragma omp parallel for
+  //pragma omp parallel for
   for(int n = 0; n < L; n++)
     for(int m = 0; m < L; m++) {
       Map< const Matrix<double, 3, 3> > dpm(&dp.data()[n * 3 * 3 + m * L * 3 * 3]);
@@ -186,7 +186,7 @@ void buildBasis(int N, double X, double Y, double Z, double density, Matrix<doub
     Zs[i + 1] = pow(Z, i);
   }
 
-  #pragma omp parallel for
+  //pragma omp parallel for
   for(int i = 0; i < ns.size(); i++) {
     for(int j = 0; j < ns.size(); j++) {
       int n0 = ns[i],

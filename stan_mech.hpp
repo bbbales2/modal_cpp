@@ -10,6 +10,7 @@ namespace rus_namespace {
   using namespace Eigen;
   using namespace stan::math;
 
+  // Build lookup tables, this is called once in the transformed data block
   template <typename T1__, typename T2__, typename T3__, typename T4__>
   Matrix<typename boost::math::tools::promote_args<T1__, T2__, T3__, T4__>::type, Dynamic, 1>
   mech_init(const int& P,
@@ -24,6 +25,11 @@ namespace rus_namespace {
     return lookup;
   }
 
+  // Rotate the 6x6 matrix of stiffness coefficients (modeling the orientation of the crystal
+  //   lattice with respect to the sample). q is a passive unit rotation quaternion for
+  //   what it's worth.
+  //
+  // This C++ function is autodiffed magically by Stan. Note the template types
   template <typename T0, typename T1>
   Matrix<typename boost::math::tools::promote_args<T0, T1>::type, Dynamic, Dynamic>
   mech_rotate(const Matrix<T0, Dynamic, Dynamic>& C,
@@ -56,12 +62,18 @@ namespace rus_namespace {
     return K * C * K.transpose();
   }
 
+  // Compute the resonance frequencies given the parameters
+  //
+  // We won't be able to use Stan's autodiff here, so we'll have to define the necessary specializations
   template <typename T1__, typename T2__>
   Matrix<typename boost::math::tools::promote_args<T1__, T2__>::type, Dynamic, 1>
   mech_rus(const int& N,
        const Matrix<T1__, Dynamic, 1>& lookup,
        const Matrix<T2__, Dynamic, Dynamic>& C, std::ostream* pstream__);
-  
+
+  // This is the function with the Magic Custom Autodiff. It takes in some stan::math::var s
+  //   and spits out some more vars with gradient information embedded in them for the backwards autodiff.
+  //   The Stan paper has a good description of how this works https://arxiv.org/abs/1509.07164
   template<>
   inline Matrix<var, Dynamic, 1>
   mech_rus(const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
@@ -74,23 +86,22 @@ namespace rus_namespace {
     Matrix<double, 6, 6> C_;
 
     if(C.rows() != 6)
-      std::cout << "WRONG NUMBER OF ROWS IN COMPLIANCE MATRIX" << std::endl;
+      throw std::runtime_error("Compliance matrix must have exactly 6 rows!");
 
     if(C.cols() != 6)
-      std::cout << "WRONG NUMBER OF COLS IN COMPLIANCE MATRIX" << std::endl;
+      throw std::runtime_error("Compliance matrix must have exactly 6 columns!");
     
     for(int i = 0; i < 6; i++)
       for(int j = 0; j < 6; j++) {
-        C_(i, j) = C(i, j).vi_->val_;
+        C_(i, j) = value_of(C(i, j));
       }
-
-    //std::cout << C_ << std::endl << std::endl;
 
     LLT< Matrix<double, 6, 6> > llt = C_.llt();
     if(llt.info() == Eigen::NumericalIssue)
-      throw std::runtime_error("Possibly non semi-positive definitie matrix!");
+      throw std::runtime_error("Compliance matrix (C) possibly non semi-positive definite!");
     
     double tmp = omp_get_wtime();
+    // This is the big custom function
     mechanics(C_, // Params
               lookup, N, // Ref data
               freqs, // Output
@@ -120,6 +131,8 @@ namespace rus_namespace {
     return retval;
   }
 
+  // I don't believe this gets called in Vanilla HMC, but cmdStan wanted a specialization
+  //   Of the function above that works with doubles. This one does not have gradient information.
   template<>
   inline Matrix<double, Dynamic, 1>
   mech_rus(const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
@@ -139,10 +152,8 @@ namespace rus_namespace {
     
     for(int i = 0; i < 6; i++)
       for(int j = 0; j < 6; j++) {
-        C_(i, j) = C(i, j);//.vi_->val_;
+        C_(i, j) = C(i, j);
       }
-
-    //std::cout << C_ << std::endl << std::endl;
 
     LLT< Matrix<double, 6, 6> > llt = C_.llt();
     if(llt.info() == Eigen::NumericalIssue)

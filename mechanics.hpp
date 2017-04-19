@@ -81,18 +81,18 @@ void eigSolve(const MatrixXd &A, const MatrixXd &B, int il, int iu, VectorXd& ei
 //   and outputs the resonance modes and all the derivatives of the
 //   resonance modes with respect to each parameter
 //
-//   Input: c11, anisotropic, c44 <- Changing mechanics parameters
-//          dp, pv <-- Lookup tables for Rayleigh-Ritz approx to problem
+//   Input: C <- Positive definite 6x6 compliance matrix. 21 effective parameters
+//          lookup <-- Lookup tables for Rayleigh-Ritz approx to problem
 //          nev <-- Number of resonance modes to compute
 //   Output:
 //          freqs nev x 1 <-- Matrix of resonance modes (directly comparable to data)
-//          (optional) dfreqs_dc11, dfreqs_da, dfreqs_dc44 nev x 1 <-- Matrices of derivatives of each resonance mode with respect to each parameter
+//          dfreqsdCij <-- Derivatives of all output frequencies (columns) with respect to all
+//                          parameters of C
 void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
                const Matrix<double, Dynamic, 1>& lookup, int nevs, // Constants
                VectorXd& freqs,  // Output
                Matrix<double, Dynamic, 21>& dfreqsdCij) { // Derivatives
   int L = int(0.5 + std::sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
-  //int L = round(sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
 
   double tmp = omp_get_wtime();
 
