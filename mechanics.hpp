@@ -94,24 +94,24 @@ void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
                Matrix<double, Dynamic, 21>& dfreqsdCij) { // Derivatives
   int L = int(0.5 + std::sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
 
-  double tmp = omp_get_wtime();
+  //double tmp = omp_get_wtime();
 
   MatrixXd K, M, _;
   std::vector< MatrixXd > dKdcij(21);
   
   buildKM(C, lookup, K, M);
 
-  if(DEBUG)
-    printf("buildKM %f\n", omp_get_wtime() - tmp);
+  //if(DEBUG)
+  //  printf("buildKM %f\n", omp_get_wtime() - tmp);
 
   VectorXd eigs;
   MatrixXd evecs;
   
-  tmp = omp_get_wtime();
+  //tmp = omp_get_wtime();
   eigSolve(K, M, 6, 6 + nevs - 1, eigs, evecs);
   
-  if(DEBUG)
-    printf("eigSolve %f\n", omp_get_wtime() - tmp);
+  //if(DEBUG)
+  //  printf("eigSolve %f\n", omp_get_wtime() - tmp);
 
   int N = K.rows();
   
@@ -121,7 +121,7 @@ void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
 
   std::vector< MatrixXd > dKdcij_evecs(21);
 
-  tmp = omp_get_wtime();
+  //tmp = omp_get_wtime();
   for(int ij = 0; ij < 21; ij++) {
     Map< const Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[L * L * 3 * 3 + L * L + ij * L * L * 3 * 3], 3 * L, 3 * L);
 
@@ -139,8 +139,8 @@ void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
       dfreqsdCij(i, ij) = (evecT * dKdcij_evecs[ij].block(0, i, N, 1))(0, 0) * dfde;
   }
   
-  if(DEBUG)
-    printf("Output prep: %f\n", omp_get_wtime() - tmp);
+  //if(DEBUG)
+  //  printf("Output prep: %f\n", omp_get_wtime() - tmp);
 }
 
 #endif

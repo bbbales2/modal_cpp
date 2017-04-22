@@ -26,8 +26,8 @@ transformed data {
 
 parameters {
   real<lower = 0.0, upper = 4.0> c11;
-  real<lower = 1.0, upper = 4.0> a;
-  real<lower = 0.25, upper = 2.0> c44;
+  real<lower = 0.0, upper = 4.0> a;
+  real<lower = 0.0, upper = 2.0> c44;
   real<lower = 0.0> sigma;
   unit_vector[4] q;
 }
@@ -59,8 +59,6 @@ transformed parameters {
 }
 
 model {
-  q[1] ~ normal(0.5, 0.1);
-  
   sigma ~ normal(0, 2.0);
 
   y ~ normal(mech_rus(N, lookup, C), sigma);

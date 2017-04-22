@@ -100,7 +100,7 @@ namespace rus_namespace {
     if(llt.info() == Eigen::NumericalIssue)
       throw std::runtime_error("Compliance matrix (C) possibly non semi-positive definite!");
     
-    double tmp = omp_get_wtime();
+    //double tmp = omp_get_wtime();
     // This is the big custom function
     mechanics(C_, // Params
               lookup, N, // Ref data
@@ -159,7 +159,7 @@ namespace rus_namespace {
     if(llt.info() == Eigen::NumericalIssue)
       throw std::runtime_error("Possibly non semi-positive definitie matrix!");
     
-    double tmp = omp_get_wtime();
+    //double tmp = omp_get_wtime();
     mechanics(C_, // Params
               lookup, N, // Ref data
               freqs, // Output
