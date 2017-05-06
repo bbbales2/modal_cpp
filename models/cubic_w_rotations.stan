@@ -27,7 +27,7 @@ transformed data {
 parameters {
   real<lower = 0.0, upper = 4.0> c11;
   real<lower = 0.0, upper = 4.0> a;
-  real<lower = 0.0, upper = 2.0> c44;
+  real<lower = 0.0, upper = 4.0> c44;
   real<lower = 0.0> sigma;
   unit_vector[4] q;
 }

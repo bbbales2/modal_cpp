@@ -46,6 +46,8 @@ namespace rus_namespace {
       2.0 * (y * x + w * z), w * w - (x * x + z * z) + y * y, 2.0 * (y * z - w * x),
       2.0 * (z * x - w * y), 2.0 * (z * y + w * x), w * w - (x * x + y * y) + z * z;
 
+    Q = Q.transpose();
+
     for(int i = 0; i < 3; i++) {
       for(int j = 0; j < 3; j++) {
         K(i, j) = Q(i, j) * Q(i, j);
