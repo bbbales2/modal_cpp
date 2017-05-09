@@ -1,6 +1,6 @@
 functions {
   vector mech_init(int P, real X, real Y, real Z, real density);
-  vector mech_rus(int N, vector lookup, matrix C);
+  vector mech_rus(int P, int N, vector lookup, matrix C);
 }
 
 data {
@@ -57,5 +57,5 @@ transformed parameters {
 model {
   sigma ~ normal(0, 2.0);
 
-  y ~ normal(mech_rus(N, lookup, C), sigma);
+  y ~ normal(mech_rus(P, N, lookup, C), sigma);
 }

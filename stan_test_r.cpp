@@ -66,7 +66,7 @@ int main() {
 
   //std::cout << C << std::endl << std::endl;
   
-  auto v1 = rus_namespace::mech_rus(N, lookup, C, NULL);
+  auto v1 = rus_namespace::mech_rus(P, N, lookup, C, NULL);
 
   VectorXd ref(N);
 

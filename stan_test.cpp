@@ -54,7 +54,7 @@ int main() {
 
   double delta = 0.00001;
 
-  auto v1 = rus_namespace::mech_rus(N, lookup, C, NULL);
+  auto v1 = rus_namespace::mech_rus(P, N, lookup, C, NULL);
 
   VectorXd ref(N);
 
@@ -93,7 +93,7 @@ int main() {
       //std::cout << Ct << std::endl << "--" << std::endl;
       //std::cout << C << std::endl << "**" << std::endl;
 
-      auto v2 = rus_namespace::mech_rus(N, lookup, Ct, NULL);
+      auto v2 = rus_namespace::mech_rus(P, N, lookup, Ct, NULL);
       
       failed = false;
       

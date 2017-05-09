@@ -51,7 +51,8 @@ void eigSolve(const MatrixXd &A, const MatrixXd &B, int il, int iu, VectorXd& ei
   int ldz = N;
   double abstol = 1e-13;//-11e-13;
   int M = 0;
-  eigs.resize(iu - il + 1, 1);
+  VectorXd W(N);
+  eigs.resize(iu - il + 1);
   evecs.resize(N, iu - il + 1);
   std::vector<int> iwork(5 * N);
   std::vector<int> ifail(N);
@@ -61,7 +62,7 @@ void eigSolve(const MatrixXd &A, const MatrixXd &B, int il, int iu, VectorXd& ei
   int lworkQuery = -1;
 
   // First call computes optimal workspace storage size
-  dsygvx_(&itype, "V", "I", "U", &N, At.data(), &lda, Bt.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, eigs.data(), evecs.data(), &ldz, &workQuery, &lworkQuery, &iwork[0], &ifail[0], &info);
+  dsygvx_(&itype, "V", "I", "U", &N, At.data(), &lda, Bt.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, W.data(), evecs.data(), &ldz, &workQuery, &lworkQuery, &iwork[0], &ifail[0], &info);
 
   //printf("Info %d, M %d, opt %f, %f\n", info, M, workQuery, omp_get_wtime() - tmp);
 
@@ -69,8 +70,9 @@ void eigSolve(const MatrixXd &A, const MatrixXd &B, int il, int iu, VectorXd& ei
   std::vector<double> work(lwork);
 
   // Second call actually computes the eigenvalues and eigenvectors!
-  dsygvx_(&itype, "V", "I", "U", &N, At.data(), &lda, Bt.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, eigs.data(), evecs.data(), &ldz, &work[0], &lwork, &iwork[0], &ifail[0], &info);
+  dsygvx_(&itype, "V", "I", "U", &N, At.data(), &lda, Bt.data(), &ldb, &zero, &zero, &il, &iu, &abstol, &M, W.data(), evecs.data(), &ldz, &work[0], &lwork, &iwork[0], &ifail[0], &info);
 
+  eigs = W.segment(0, iu - il + 1);
   //evecs /= sqrt(max);
 
   //printf("Info %d, M %d, opt %f, %f\n", info, M, work[0], omp_get_wtime() - tmp);
@@ -89,17 +91,16 @@ void eigSolve(const MatrixXd &A, const MatrixXd &B, int il, int iu, VectorXd& ei
 //          dfreqsdCij <-- Derivatives of all output frequencies (columns) with respect to all
 //                          parameters of C
 void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
-               const Matrix<double, Dynamic, 1>& lookup, int nevs, // Constants
+               int P, const Matrix<double, Dynamic, 1>& lookup, int nevs, // Constants
                VectorXd& freqs,  // Output
                Matrix<double, Dynamic, 21>& dfreqsdCij) { // Derivatives
-  int L = int(0.5 + std::sqrt(lookup.size() / (3 * 3 + 1 + 3 * 3 * 21 + 3 * 3)));
+  int L = (P + 1) * (P + 2) * (P + 3) / 6;
 
   //double tmp = omp_get_wtime();
 
-  MatrixXd K, M, _;
-  std::vector< MatrixXd > dKdcij(21);
+  MatrixXd K, M;
   
-  buildKM(C, lookup, K, M);
+  buildKM(P, C, lookup, K, M);
 
   //if(DEBUG)
   //  printf("buildKM %f\n", omp_get_wtime() - tmp);
@@ -119,13 +120,13 @@ void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
 
   dfreqsdCij.resize(nevs, 21);
 
-  std::vector< MatrixXd > dKdcij_evecs(21);
+  std::vector< MatrixXd > dKdcij_evecs;
 
   //tmp = omp_get_wtime();
   for(int ij = 0; ij < 21; ij++) {
     Map< const Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[L * L * 3 * 3 + L * L + ij * L * L * 3 * 3], 3 * L, 3 * L);
 
-    dKdcij_evecs[ij] = dKdcij * evecs;
+    dKdcij_evecs.push_back(dKdcij * evecs);
   }
   
   for(int i = 0; i < nevs; i++) {

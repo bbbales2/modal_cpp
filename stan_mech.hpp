@@ -69,7 +69,7 @@ namespace rus_namespace {
   // We won't be able to use Stan's autodiff here, so we'll have to define the necessary specializations
   template <typename T1__, typename T2__>
   Matrix<typename boost::math::tools::promote_args<T1__, T2__>::type, Dynamic, 1>
-  mech_rus(const int& N,
+  mech_rus(const int& P, const int& N,
        const Matrix<T1__, Dynamic, 1>& lookup,
        const Matrix<T2__, Dynamic, Dynamic>& C, std::ostream* pstream__);
 
@@ -78,7 +78,7 @@ namespace rus_namespace {
   //   The Stan paper has a good description of how this works https://arxiv.org/abs/1509.07164
   template<>
   inline Matrix<var, Dynamic, 1>
-  mech_rus(const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
+  mech_rus(const int &P, const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
            const Matrix<var, Dynamic, Dynamic>& C, // Parameters
            std::ostream *stream) {
     Matrix<double, Dynamic, 1> freqs(N, 1);
@@ -105,7 +105,7 @@ namespace rus_namespace {
     //double tmp = omp_get_wtime();
     // This is the big custom function
     mechanics(C_, // Params
-              lookup, N, // Ref data
+              P, lookup, N, // Ref data
               freqs, // Output
               dfreqsdCij); // Gradients
 
@@ -137,7 +137,7 @@ namespace rus_namespace {
   //   Of the function above that works with doubles. This one does not have gradient information.
   template<>
   inline Matrix<double, Dynamic, 1>
-  mech_rus(const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
+  mech_rus(const int &P, const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
            const Matrix<double, Dynamic, Dynamic>& C, // Parameters
            std::ostream *stream) {
     Matrix<double, Dynamic, 1> freqs(N, 1);
@@ -163,7 +163,7 @@ namespace rus_namespace {
     
     //double tmp = omp_get_wtime();
     mechanics(C_, // Params
-              lookup, N, // Ref data
+              P, lookup, N, // Ref data
               freqs, // Output
               dfreqsdCij); // Gradients
 
