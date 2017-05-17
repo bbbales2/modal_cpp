@@ -157,9 +157,12 @@ namespace rus_namespace {
     return hot;
   }
 
-  template <typename T>
+  template <typename T0__>
+  Eigen::Matrix<typename boost::math::tools::promote_args<T0__>::type, Eigen::Dynamic,1>
+  cu2qu(const Eigen::Matrix<T0__, Eigen::Dynamic,1>& cu, std::ostream* pstream__) {
+    /*template <typename T>
   Matrix<T, Dynamic, 1>
-  cu2qu(const Matrix<T, Dynamic, 1> &cu, std::ostream *pstream__) {
+  cu2qu(const Matrix<T, Dynamic, 1> &cu, std::ostream *pstream__ = NULL) {*/
     return ax2qu(ho2ax(cu2ho(cu)));
   }
 
