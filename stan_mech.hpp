@@ -117,7 +117,7 @@ namespace rus_namespace {
     //operation M2
     bool swapped = false;
 
-    if(abs(ho(0).val()) > abs(ho[1])) {
+    if(abs(ho(0)) > abs(ho[1])) {
       swapped = true;
       std::swap(ho(0), ho(1));
     }
