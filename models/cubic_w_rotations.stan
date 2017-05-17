@@ -37,14 +37,17 @@ parameters {
   real<lower = 0.0, upper = 4.0> c11;
   real<lower = 0.0, upper = 4.0> a;
   real<lower = 0.0, upper = 2.0> c44;
-  real<lower = 0.0> sigma; // we'll estimate measurement noise
+  real<lower = 0.0> invsigma; // we'll estimate measurement noise
   unit_vector[4] q; // rotation between sample & xtal axes
 }
 
 // Build a 6x6 stiffness matrix and rotate it
 transformed parameters {
+  real sigma;
   real c12;
   matrix[6, 6] C;
+
+  sigma = 1 / invsigma;
   
   c12 = -(c44 * 2.0 / a - c11);
 
@@ -70,9 +73,14 @@ transformed parameters {
 
 // This is the probabilistic model
 model {
+  vector[N] modes;
   // Specify a prior on noise level. Units are khz, we expect ~100-300hz in a good fit
-  sigma ~ normal(0, 2.0);
+  invsigma ~ gamma(3.0, 0.5);
+
+  modes = mech_rus(P, N, lookup, C);
 
   // Resonance modes are normally distributed around what you'd expect from an RUS calculation
-  y ~ normal(mech_rus(P, N, lookup, C), sigma);
+  y ~ normal(modes, sigma);
+
+  print(y - modes);
 }

@@ -49,7 +49,7 @@ export OMP_NUM_THREADS=1
 
 cd $PBS_O_WORKDIR
 
-/home/bbales2/modal_cpp/models/cubic_w_rotations sample algorithm=hmc engine=nuts max_depth=7 num_samples=1000 num_warmup=1000 save_warmup=1 id=$(echo $PBS_JOBID | sed -e 's/[^0-9]//g') data file=input.dat output file=$PBS_JOBID.csv refresh=1
+/home/bbales2/modal_cpp/models/cubic_w_rotations sample algorithm=hmc num_samples=500 num_warmup=500 save_warmup=1 id=$(echo $PBS_JOBID | sed -e 's/[^0-9]//g') data file=input.dat output file=$PBS_JOBID.csv refresh=1
 """
 
 tmp = """
@@ -63,7 +63,7 @@ L <- {6}
 y <- c({7})
 """
 
-for i in range(50):
+for i in range(10):
     sigma = numpy.random.uniform(0.1, 0.4)
 
     X = numpy.random.uniform(0.005, 0.02)
