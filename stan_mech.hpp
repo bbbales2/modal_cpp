@@ -140,7 +140,7 @@ namespace rus_namespace {
 
     ho(2) = sqrt(6.0 / M_PI) * ho(2) - k * sqrt(M_PI / 24.0) / ho(2);
 
-    Matrix<T, Dynamic, 1> hot;    
+    Matrix<T, Dynamic, 1> hot(3);
 
     if(maxX == cu(2)) {
       hot = ho;
