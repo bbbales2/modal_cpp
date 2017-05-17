@@ -76,7 +76,7 @@ int main() {
 
   cu << 0.80057441, 0.66424955, 1.02499762;
 
-  quc = rus_namespace::cu2qu(cu);
+  quc = rus_namespace::cu2qu(cu, NULL);
 
   quref << 0.1,
     0.5,

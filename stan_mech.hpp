@@ -159,7 +159,7 @@ namespace rus_namespace {
 
   template <typename T>
   Matrix<T, Dynamic, 1>
-  cu2qu(const Matrix<T, Dynamic, 1> &cu, std::ostream *pstream__ = NULL) {
+  cu2qu(const Matrix<T, Dynamic, 1> &cu, std::ostream *pstream__) {
     return ax2qu(ho2ax(cu2ho(cu)));
   }
 
