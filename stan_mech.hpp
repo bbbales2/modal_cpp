@@ -92,8 +92,8 @@ namespace rus_namespace {
   template <typename T>
   Matrix<T, Dynamic, 1>
   cu2ho(const Matrix<T, Dynamic, 1> &cu) {
-    //if max([abs(i) for i in cu]) > cuA() / 2.0 + 7.0 * epsilon:
-    //raise ValueError("'%f' lies outside the cube of side length pi^(2/3)" % cu)
+    if(cu.array().abs().matrix().maxCoeff() > 1.0725146985555127)
+      throw std::domain_error("element of cu lies outside the range (-pi^(2/3), pi^(2/3))");
 
     T maxX = max(cu);
     Matrix<T, Dynamic, 1> ho(3);
@@ -160,9 +160,6 @@ namespace rus_namespace {
   template <typename T0__>
   Eigen::Matrix<typename boost::math::tools::promote_args<T0__>::type, Eigen::Dynamic,1>
   cu2qu(const Eigen::Matrix<T0__, Eigen::Dynamic,1>& cu, std::ostream* pstream__) {
-    /*template <typename T>
-  Matrix<T, Dynamic, 1>
-  cu2qu(const Matrix<T, Dynamic, 1> &cu, std::ostream *pstream__ = NULL) {*/
     return ax2qu(ho2ax(cu2ho(cu)));
   }
 
