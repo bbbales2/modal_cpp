@@ -94,17 +94,18 @@ namespace rus_namespace {
   cu2ho(const Matrix<T, Dynamic, 1> &cu) {
     if(cu.array().abs().matrix().maxCoeff() > 1.0725146985555127)
       throw std::domain_error("element of cu lies outside the range (-pi^(2/3), pi^(2/3))");
-
-    T maxX = max(cu);
+    
+    typename Matrix<T, Dynamic, 1>::Index p;
+    cu.array().abs().matrix().maxCoeff(&p);
     Matrix<T, Dynamic, 1> ho(3);
 
-    if(maxX == cu(2)) {
+    if(p == 2) {
       ho = cu;
-    } else if(maxX == cu(0)) {
+    } else if(p == 0) {
       ho(0) = cu(1);
       ho(1) = cu(2);
       ho(2) = cu(0);
-    } else if(maxX == cu(1)) {
+    } else if(p == 1) {
       ho(0) = cu(2);
       ho(1) = cu(0);
       ho(2) = cu(1);
@@ -142,13 +143,13 @@ namespace rus_namespace {
 
     Matrix<T, Dynamic, 1> hot(3);
 
-    if(maxX == cu(2)) {
+    if(p == 2) {
       hot = ho;
-    } else if(maxX == cu(0)) {
+    } else if(p == 0) {
       hot(0) = ho(2);
       hot(1) = ho(0);
       hot(2) = ho(1);
-    } else if(maxX == cu(1)) {
+    } else if(p == 1) {
       hot(0) = ho(1);
       hot(1) = ho(2);
       hot(2) = ho(0);
