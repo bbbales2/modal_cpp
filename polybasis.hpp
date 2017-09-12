@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <cmath>
-#include <Eigen/Core>
+//#include <Eigen/Core>
 
 #include "util.hpp"
 

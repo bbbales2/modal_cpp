@@ -1,7 +1,5 @@
 #include <stan/math.hpp>
 #include <iostream>
-#include <Eigen/Core>
-#include <Eigen/Dense>
 #include <cmath>
 
 #include "util.hpp"

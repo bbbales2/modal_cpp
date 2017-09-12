@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include <Eigen/LU>
 #include <Eigen/Dense>
+//#include <stan/math/prim/mat/fun/Eigen.hpp>
 #include <stdio.h>
 #include <iostream>
 #include <cmath>

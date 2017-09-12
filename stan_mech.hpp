@@ -238,51 +238,12 @@ namespace rus_namespace {
     return K * C * K.transpose();
   }
 
-  // Compute the resonance frequencies given the parameters
-  //
-  // We won't be able to use Stan's autodiff here, so we'll have to define the necessary specializations
-  template <typename T1__, typename T2__>
-  Matrix<typename boost::math::tools::promote_args<T1__, T2__>::type, Dynamic, 1>
-  mech_rus(const int& P, const int& N,
-       const Matrix<T1__, Dynamic, 1>& lookup,
-       const Matrix<T2__, Dynamic, Dynamic>& C, std::ostream* pstream__);
-
-  // This is the function with the Magic Custom Autodiff. It takes in some stan::math::var s
-  //   and spits out some more vars with gradient information embedded in them for the backwards autodiff.
-  //   The Stan paper has a good description of how this works https://arxiv.org/abs/1509.07164
-  template<>
-  inline Matrix<var, Dynamic, 1>
-  mech_rus(const int &P, const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
-           const Matrix<var, Dynamic, Dynamic>& C, // Parameters
-           std::ostream *stream) {
-    Matrix<double, Dynamic, 1> freqs(N, 1);
-
-    Matrix<double, Dynamic, 21> dfreqsdCij(N, 21);
-
-    Matrix<double, 6, 6> C_;
-
-    if(C.rows() != 6)
-      throw std::runtime_error("Compliance matrix must have exactly 6 rows!");
-
-    if(C.cols() != 6)
-      throw std::runtime_error("Compliance matrix must have exactly 6 columns!");
+  // If mech_rus was passed vars, we need to package up the gradients for the output
+  inline Matrix<var, Dynamic, 1> build_output(const Matrix<var, Dynamic, Dynamic>& C,
+                                              const Matrix<double, Dynamic, 1>& freqs,
+                                              const Matrix<double, Dynamic, 21>& dfreqsdCij) {
+    int N = freqs.size();
     
-    for(int i = 0; i < 6; i++)
-      for(int j = 0; j < 6; j++) {
-        C_(i, j) = value_of(C(i, j));
-      }
-
-    LLT< Matrix<double, 6, 6> > llt = C_.llt();
-    if(llt.info() == Eigen::NumericalIssue)
-      throw std::runtime_error("Compliance matrix (C) possibly non semi-positive definite!");
-    
-    //double tmp = omp_get_wtime();
-    // This is the big custom function
-    mechanics(C_, // Params
-              P, lookup, N, // Ref data
-              freqs, // Output
-              dfreqsdCij); // Gradients
-
     Matrix<var, Dynamic, 1> retval(N);
   
     vari** params = ChainableStack::memalloc_.alloc_array<vari *>(21);
@@ -307,12 +268,28 @@ namespace rus_namespace {
     return retval;
   }
 
-  // I don't believe this gets called in Vanilla HMC, but cmdStan wanted a specialization
-  //   Of the function above that works with doubles. This one does not have gradient information.
-  template<>
-  inline Matrix<double, Dynamic, 1>
-  mech_rus(const int &P, const int& N, const Matrix<double, Dynamic, 1>& lookup, // Constant data
-           const Matrix<double, Dynamic, Dynamic>& C, // Parameters
+  // If mech_rus was passed only doubles, then we don't need to fuss with the gradients
+  inline Matrix<double, Dynamic, 1> build_output(const Matrix<double, Dynamic, Dynamic>& C,
+                                                 const Matrix<double, Dynamic, 1>& freqs,
+                                                 const Matrix<double, Dynamic, 21>& dfreqsdCij) {
+    return freqs;
+  }
+
+  // Compute the resonance frequencies given the parameters
+  //
+  // We won't be able to use Stan's autodiff here, so we'll have to define the
+  // necessary specializations
+  //
+  // This is the function takes in some stan::math::var s and spits out some
+  // more vars with gradient information embedded in them for the backwards autodiff.
+  //
+  // The Stan paper has a good description of how this works
+  // https://arxiv.org/abs/1509.07164
+  template<typename T1, typename T2>
+  inline Matrix<typename boost::math::tools::promote_args<T1, T2>::type, Dynamic, 1>
+  mech_rus(const int &P, const int& N,
+           const Matrix<T1, Dynamic, 1>& lookup, // Constant data
+           const Matrix<T2, Dynamic, Dynamic>& C, // Parameters
            std::ostream *stream) {
     Matrix<double, Dynamic, 1> freqs(N, 1);
 
@@ -321,26 +298,31 @@ namespace rus_namespace {
     Matrix<double, 6, 6> C_;
 
     if(C.rows() != 6)
-      std::cout << "WRONG NUMBER OF ROWS IN COMPLIANCE MATRIX" << std::endl;
+      throw std::runtime_error("Compliance matrix must have exactly 6 rows!");
 
     if(C.cols() != 6)
-      std::cout << "WRONG NUMBER OF COLS IN COMPLIANCE MATRIX" << std::endl;
+      throw std::runtime_error
+        ("Compliance matrix must have exactly 6 columns!");
     
     for(int i = 0; i < 6; i++)
       for(int j = 0; j < 6; j++) {
-        C_(i, j) = C(i, j);
+        C_(i, j) = value_of(C(i, j));
       }
 
     LLT< Matrix<double, 6, 6> > llt = C_.llt();
     if(llt.info() == Eigen::NumericalIssue)
-      throw std::runtime_error("Possibly non semi-positive definitie matrix!");
+      throw std::runtime_error
+        ("Compliance matrix (C) non semi-positive definite!");
     
     //double tmp = omp_get_wtime();
+    // This is the big custom function
     mechanics(C_, // Params
               P, lookup, N, // Ref data
               freqs, // Output
               dfreqsdCij); // Gradients
 
-    return freqs;
+    // Package up output (this will be different depending on the template
+    // types of the inputs)
+    return build_output(C, freqs, dfreqsdCij);
   }
 }
