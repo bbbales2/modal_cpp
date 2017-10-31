@@ -311,7 +311,7 @@ namespace rus_namespace {
 
     LLT< Matrix<double, 6, 6> > llt = C_.llt();
     if(llt.info() == Eigen::NumericalIssue)
-      throw std::runtime_error
+      throw std::domain_error
         ("Compliance matrix (C) non semi-positive definite!");
     
     //double tmp = omp_get_wtime();
