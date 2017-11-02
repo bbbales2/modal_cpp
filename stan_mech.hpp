@@ -54,7 +54,7 @@ namespace rus_namespace {
 
       T delta = fx - y;
 
-      T err = abs(delta);
+      T err = stan::math::abs(delta);
 
       if(0.0 == value_of(delta) || err == prevErr) // no error or flipping between +/- v
         return x;
@@ -118,7 +118,7 @@ namespace rus_namespace {
     //operation M2
     bool swapped = false;
 
-    if(abs(ho(0)) > abs(ho[1])) {
+    if(stan::math::abs(ho(0)) > stan::math::abs(ho[1])) {
       swapped = true;
       std::swap(ho(0), ho(1));
     }
