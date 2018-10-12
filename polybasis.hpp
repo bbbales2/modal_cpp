@@ -100,13 +100,10 @@ Matrix<double, 9, 9> voigt(const Matrix<double, 6, 6>& Ch) {
   return C;
 }
 
-void buildK(int P, const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& lookup, Map< MatrixXd >& K) {
+MatrixXd buildK(int P, const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& dp) {
   int L = (P + 1) * (P + 2) * (P + 3) / 6;
 
-  K.resize(L * 3, L * 3);
-  K.setZero();
-
-  Map< const Matrix<double, Dynamic, 1> > dp(&lookup.data()[0], L * L * 3 * 3);
+  MatrixXd K = MatrixXd::Zero(L * 3, L * 3);
 
   Matrix<double, 9, 9> C = voigt(Ch);
 
@@ -125,15 +122,14 @@ void buildK(int P, const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic,
           K(n * 3 + i, m * 3 + k) = total;
         }
     }
+
+  return K;
 }
 
-void buildM(int P, const Matrix<double, Dynamic, 1>& lookup, Map< MatrixXd >& M) {
+MatrixXd buildM(int P, const Matrix<double, Dynamic, Dynamic>& pv) {
   int L = (P + 1) * (P + 2) * (P + 3) / 6;
 
-  Map< const Matrix<double, Dynamic, Dynamic> > pv(&lookup.data()[L * L * 3 * 3], L, L);
-  
-  M.resize(L * 3, L * 3);
-  M.setZero();
+  MatrixXd M = MatrixXd::Zero(L * 3, L * 3);
 
   for(int n = 0; n < L; n++) {
     for(int m = 0; m < L; m++) {
@@ -142,6 +138,8 @@ void buildM(int P, const Matrix<double, Dynamic, 1>& lookup, Map< MatrixXd >& M)
       M(n * 3 + 2, m * 3 + 2) = pv(n, m);
     }
   }
+
+  return M;
 }
 
 double polyint(int n, int m, int l)
@@ -174,10 +172,10 @@ void buildBasis(int P, double X, double Y, double Z, double density, Matrix<doub
   if(L != (P + 1) * (P + 2) * (P + 3) / 6)
     throw std::logic_error("This should never happen. Make sure P is even. P = 10 or P = 12 should work");
 
-  lookup.resize(L * L * 3 * 3 + L * L + L * L * 3 * 3 * 21 + L * L * 3 * 3);
+  lookup.resize(L * L * 3 * 3 * 21);
 
-  Map< Matrix<double, Dynamic, 1> > dp(&lookup.data()[0], L * L * 3 * 3);
-  Map< Matrix<double, Dynamic, Dynamic> > pv(&lookup.data()[L * L * 3 * 3], L, L);
+  Matrix<double, Dynamic, 1> dp(L * L * 3 * 3);
+  Matrix<double, Dynamic, Dynamic> pv(L, L);
 
   std::vector<double> Xs(2 * P + 3, 0.0),
     Ys(2 * P + 3, 0.0),
@@ -217,25 +215,25 @@ void buildBasis(int P, double X, double Y, double Z, double density, Matrix<doub
     }
   }
 
+  LLT< MatrixXd > M = buildM(P, pv).llt();
+
   int ij = 0;
   for(int i = 0; i < 6; i++) {
     for(int j = 0; j < i + 1; j++) {
-      Map< Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[L * L * 3 * 3 + L * L + ij * L * L * 3 * 3], 3 * L, 3 * L);
+      Map< Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[ij * L * L * 3 * 3], 3 * L, 3 * L);
 
       Matrix<double, 6, 6> dCdcij = Matrix<double, 6, 6>::Zero();
         
       dCdcij(i, j) = 1.0;
       dCdcij(j, i) = 1.0;
         
-      buildK(P, dCdcij, lookup, dKdcij);
+      MatrixXd dKtmp = buildK(P, dCdcij, dp);
 
+      dKdcij = M.matrixL().solve(M.matrixL().solve(dKtmp.transpose()).transpose());
+      
       ij++;
     }
   }
-
-  Map< Matrix<double, Dynamic, Dynamic> > M(&lookup.data()[L * L * 3 * 3 + L * L + 21 * L * L * 3 * 3], L * 3, L * 3);
-
-  buildM(P, lookup, M);
 }
 
 Matrix<double, 6, 6> unvoigt(const Matrix<double, 9, 9>& Ch) {

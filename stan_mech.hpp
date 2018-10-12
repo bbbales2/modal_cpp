@@ -303,11 +303,12 @@ namespace rus_namespace {
     if(C.cols() != 6)
       throw std::runtime_error
         ("Compliance matrix must have exactly 6 columns!");
-    
-    for(int i = 0; i < 6; i++)
+
+    for(int i = 0; i < 6; i++) {
       for(int j = 0; j < 6; j++) {
         C_(i, j) = value_of(C(i, j));
       }
+    }
 
     LLT< Matrix<double, 6, 6> > llt = C_.llt();
     if(llt.info() == Eigen::NumericalIssue)
