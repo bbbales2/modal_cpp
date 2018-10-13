@@ -10,6 +10,25 @@ namespace rus_namespace {
   using namespace Eigen;
   using namespace stan::math;
 
+  int bilayer_size(const int& IN,
+                   const int& JN,
+                   const int& KN, std::ostream* pstream__) {
+    return computeBilayerSize(IN, JN, KN);
+  }
+
+  template <typename T3__, typename T4__, typename T5__, typename T6__, typename T7__>
+  Eigen::Matrix<typename boost::math::tools::promote_args<T3__, T4__, T5__, T6__, typename boost::math::tools::promote_args<T7__>::type>::type, Eigen::Dynamic,1>
+  bilayer_init(const int& IN,
+               const int& JN,
+               const int& layer_index,
+               const T3__& X,
+               const T4__& Y,
+               const Eigen::Matrix<T5__, Eigen::Dynamic,1>& Zs,
+               const T6__& bulk_density,
+               const T7__& layer_density, std::ostream* pstream__) {
+    return buildBilayerBasis(IN, JN, layer_index, X, Y, Zs, bulk_density, layer_density);
+  }
+
   // Build lookup tables, this is called once in the transformed data block
   template <typename T1__, typename T2__, typename T3__, typename T4__>
   Matrix<typename boost::math::tools::promote_args<T1__, T2__, T3__, T4__>::type, Dynamic, 1>
@@ -287,7 +306,7 @@ namespace rus_namespace {
   // https://arxiv.org/abs/1509.07164
   template<typename T1, typename T2>
   inline Matrix<typename boost::math::tools::promote_args<T1, T2>::type, Dynamic, 1>
-  mech_rus(const int &P, const int& N,
+  mech_rus(const int& N,
            const Matrix<T1, Dynamic, 1>& lookup, // Constant data
            const Matrix<T2, Dynamic, Dynamic>& C, // Parameters
            std::ostream *stream) {
@@ -318,7 +337,7 @@ namespace rus_namespace {
     //double tmp = omp_get_wtime();
     // This is the big custom function
     mechanics(C_, // Params
-              P, lookup, N, // Ref data
+              lookup, N, // Ref data
               freqs, // Output
               dfreqsdCij); // Gradients
 
