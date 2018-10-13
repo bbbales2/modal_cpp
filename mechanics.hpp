@@ -16,46 +16,52 @@
 //   and outputs the resonance modes and all the derivatives of the
 //   resonance modes with respect to each parameter
 //
-//   Input: C <- Positive definite 6x6 compliance matrix. 21 effective parameters
+//   Input: C <- Elastic constants
 //          lookup <-- Lookup tables for Rayleigh-Ritz approx to problem
 //          nev <-- Number of resonance modes to compute
 //   Output:
 //          freqs nev x 1 <-- Matrix of resonance modes (directly comparable to data)
 //          dfreqsdCij <-- Derivatives of all output frequencies (columns) with respect to all
 //                          parameters of C
-void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
-               int P, const Matrix<double, Dynamic, 1>& lookup, int nevs, // Constants
+void mechanics(const VectorXd& C, //Changing parameters
+               const VectorXd& lookup, int nevs, // Constants
                VectorXd& freqs,  // Output
-               Matrix<double, Dynamic, 21>& dfreqsdCij) { // Derivatives
-  int L = (P + 1) * (P + 2) * (P + 3) / 6;
-
+               Matrix<double, Dynamic, Dynamic>& dfreqsdCij) { // Derivatives
   double tmp = omp_get_wtime();
+
+  int L = 1;
+
+  for(L = 1; L < lookup.size(); L++) {
+    if(3 * 3 * L * L * C.size() == lookup.size()) {
+      break;
+    }
+  }
+  
+  if(L == lookup.size())
+    throw std::runtime_error("Solve for L in 3 * 3 * L * L * C.size() == lookup.size() failed");
 
   MatrixXf K = MatrixXf::Zero(3 * L, 3 * L);
 
   int ij = 0;
-  for(int i = 0; i < 6; i++) {
-    for(int j = 0; j < i + 1; j++) {
-      Map< const Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[ij * L * L * 3 * 3], 3 * L, 3 * L);
+  for(int i = 0; i < C.size(); i++) {
+    Map< const Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[ij * L * L * 3 * 3], 3 * L, 3 * L);
 
-      for(int l = 0; l < K.size(); l++)
-        K(l) += dKdcij(l) * C(i, j);
+    for(int l = 0; l < K.size(); l++)
+      K(l) += dKdcij(l) * C(i);
 
-      ij++;
-    }
+    ij++;
   }
   printf("Build matrix: %f\n", omp_get_wtime() - tmp);
   
   tmp = omp_get_wtime();
   Spectra::DenseSymShiftSolve<float> op(K);
-  Spectra::SymEigsShiftSolver<float, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<float> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 1.0);
+  Spectra::SymEigsShiftSolver<float, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<float> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 2.0);
 
   // Initialize and compute
   esolve.init();
   int nconv = esolve.compute();
   printf("Eigensolve: %f\n", omp_get_wtime() - tmp);
 
-  tmp = omp_get_wtime();
   // Retrieve results
   if(esolve.info() != Spectra::SUCCESSFUL) {
     throw std::runtime_error("Eigenvalue solve failed!");
@@ -64,6 +70,7 @@ void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
   VectorXd eigs(nevs);
   MatrixXf evecsr = esolve.eigenvectors();
   MatrixXd evecs(esolve.eigenvectors().rows(), nevs);
+  tmp = omp_get_wtime();
 
   //std::cout << esolve.eigenvalues() << std::endl;
 
@@ -85,12 +92,12 @@ void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
 
   freqs.resize(nevs);
 
-  dfreqsdCij.resize(nevs, 21);
+  dfreqsdCij.resize(nevs, C.size());
 
   std::vector< MatrixXd > dKdcij_evecs;
 
-  for(int ij = 0; ij < 21; ij++) {
-    Map< const Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[ij * L * L * 3 * 3], 3 * L, 3 * L);
+  for(int i = 0; i < C.size(); i++) {
+    Map< const Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[i * L * L * 3 * 3], 3 * L, 3 * L);
 
     dKdcij_evecs.push_back(dKdcij * evecs);
   }
@@ -102,13 +109,8 @@ void mechanics(const Matrix<double, 6, 6>& C, //Changing parameters
     VectorXd evec = evecs.block(0, k, N, 1).eval();
     RowVectorXd evecT = evec.transpose().eval();
 
-    int ij = 0;
-    for(int i = 0; i < 6; i++) {
-      for(int j = 0; j < i + 1; j++) {
-        dfreqsdCij(k, ij) = (evecT * dKdcij_evecs[ij].block(0, k, N, 1))(0, 0) * dfde;
-
-        ij++;
-      }
+    for(int i = 0; i < C.size(); i++) {
+      dfreqsdCij(k, i) = (evecT * dKdcij_evecs[i].block(0, k, N, 1))(0, 0) * dfde;
     }
   }
   
