@@ -246,7 +246,7 @@ namespace rus_namespace {
     
     Matrix<var, Dynamic, 1> retval(N);
   
-    vari** params = ChainableStack::memalloc_.alloc_array<vari *>(21);
+    vari** params = ChainableStack::instance().memalloc_.alloc_array<vari *>(21);
 
     int ij = 0;
     for(int i = 0; i < 6; i++)
@@ -257,7 +257,7 @@ namespace rus_namespace {
       }
 
     for(int i = 0; i < N; i++) {
-      double* gradients = ChainableStack::memalloc_.alloc_array<double>(21);
+      double* gradients = ChainableStack::instance().memalloc_.alloc_array<double>(21);
 
       for(int ij = 0; ij < 21; ij++)
         gradients[ij] = dfreqsdCij(i, ij);
@@ -287,7 +287,7 @@ namespace rus_namespace {
   // https://arxiv.org/abs/1509.07164
   template<typename T1, typename T2>
   inline Matrix<typename boost::math::tools::promote_args<T1, T2>::type, Dynamic, 1>
-  mech_rus(const int &P, const int& N,
+  mech_rus(const int& P, const int& N,
            const Matrix<T1, Dynamic, 1>& lookup, // Constant data
            const Matrix<T2, Dynamic, Dynamic>& C, // Parameters
            std::ostream *stream) {
