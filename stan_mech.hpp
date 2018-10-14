@@ -10,6 +10,25 @@ namespace rus_namespace {
   using namespace Eigen;
   using namespace stan::math;
 
+  int bilayer_size(const int& IN,
+                   const int& JN,
+                   const int& KN, std::ostream* pstream__) {
+    return computeBilayerSize(IN, JN, KN);
+  }
+
+  template <typename T3__, typename T4__, typename T5__, typename T6__, typename T7__>
+  Eigen::Matrix<typename boost::math::tools::promote_args<T3__, T4__, T5__, T6__, typename boost::math::tools::promote_args<T7__>::type>::type, Eigen::Dynamic,1>
+  bilayer_init(const int& IN,
+               const int& JN,
+               const int& layer_index,
+               const T3__& X,
+               const T4__& Y,
+               const Eigen::Matrix<T5__, Eigen::Dynamic,1>& Zs,
+               const T6__& bulk_density,
+               const T7__& layer_density, std::ostream* pstream__) {
+    return buildBilayerBasis(IN, JN, layer_index, X, Y, Zs, bulk_density, layer_density);
+  }
+
   // Build lookup tables, this is called once in the transformed data block
   template <typename T1__, typename T2__, typename T3__, typename T4__>
   Matrix<typename boost::math::tools::promote_args<T1__, T2__, T3__, T4__>::type, Dynamic, 1>
@@ -239,40 +258,84 @@ namespace rus_namespace {
   }
 
   // If mech_rus was passed vars, we need to package up the gradients for the output
-  inline Matrix<var, Dynamic, 1> build_output(const Matrix<var, Dynamic, Dynamic>& C,
+  inline Matrix<var, Dynamic, 1> build_output(const Matrix<var, Dynamic, 1>& C,
                                               const Matrix<double, Dynamic, 1>& freqs,
-                                              const Matrix<double, Dynamic, 21>& dfreqsdCij) {
+                                              const Matrix<double, Dynamic, Dynamic>& dfreqsdCij) {
     int N = freqs.size();
     
     Matrix<var, Dynamic, 1> retval(N);
-  
-    vari** params = ChainableStack::instance().memalloc_.alloc_array<vari *>(21);
 
-    int ij = 0;
-    for(int i = 0; i < 6; i++)
-      for(int j = 0; j < i + 1; j++) {
-        params[ij] = C(i, j).vi_;
+    vari** params = ChainableStack::instance().memalloc_.alloc_array<vari *>(C.size());
 
-        ij++;
-      }
+    for(int i = 0; i < C.size(); i++) {
+      params[i] = C(i).vi_;
+    }
 
     for(int i = 0; i < N; i++) {
-      double* gradients = ChainableStack::instance().memalloc_.alloc_array<double>(21);
+      double* gradients = ChainableStack::instance().memalloc_.alloc_array<double>(C.size());
 
-      for(int ij = 0; ij < 21; ij++)
-        gradients[ij] = dfreqsdCij(i, ij);
+      for(int j = 0; j < C.size(); j++)
+        gradients[j] = dfreqsdCij(i, j);
         
-      retval(i) = var(new stored_gradient_vari(freqs(i), 21, params, gradients));
+      retval(i) = var(new stored_gradient_vari(freqs(i), C.size(), params, gradients));
     }
   
     return retval;
   }
 
   // If mech_rus was passed only doubles, then we don't need to fuss with the gradients
-  inline Matrix<double, Dynamic, 1> build_output(const Matrix<double, Dynamic, Dynamic>& C,
+  inline Matrix<double, Dynamic, 1> build_output(const Matrix<double, Dynamic, 1>& C,
                                                  const Matrix<double, Dynamic, 1>& freqs,
-                                                 const Matrix<double, Dynamic, 21>& dfreqsdCij) {
+                                                 const Matrix<double, Dynamic, Dynamic>& dfreqsdCij) {
     return freqs;
+  }
+
+  inline void flatten(int Ksize,
+                      const Matrix<double, Dynamic, 1>& lookup, // Constant data
+                      const Matrix<var, Dynamic, Dynamic>& C, // Parameters
+                      VectorXd& lookup_,
+                      Matrix<var, Dynamic, 1>& C_) {
+    std::map<vari *, var> unique;
+    std::map<vari *, VectorXd> lookup_map;
+    int ij = 0;
+    for(int i = 0; i < 6; i++) {
+      for(int j = 0; j < i + 1; j++) {
+        if(unique.find(C(i, j).vi_) == unique.end()) {
+          unique[C(i, j).vi_] = C(i, j);
+          lookup_map[C(i, j).vi_] = VectorXd::Zero(Ksize);
+        }
+        for(int k = 0; k < Ksize; k++) {
+          lookup_map[C(i, j).vi_](k) += lookup[ij * Ksize + k];
+        }
+        ij += 1;
+      }
+    }
+    C_.resize(unique.size());
+    lookup_.resize(Ksize * unique.size());
+    
+    int i = 0;
+    for(auto&& it : unique) {
+      C_(i) = it.second;
+      for(int j = 0; j < Ksize; j++) {
+        lookup_[i * Ksize + j] = lookup_map[it.first](j);
+      }
+      i += 1;
+    }
+  }
+
+  inline void flatten(int Ksize,
+                      const Matrix<double, Dynamic, 1>& lookup, // Constant data
+                      const Matrix<double, Dynamic, Dynamic>& C, // Parameters
+                      VectorXd& dfreqsdCij,
+                      VectorXd& C_) {
+    dfreqsdCij = lookup;
+    C_.resize(21);
+    int ij = 0;
+    for(int i = 0; i < 6; i++) {
+      for(int j = 0; j < i + 1; j++) {
+        C_(i) = C(i, j);
+      }
+    }
   }
 
   // Compute the resonance frequencies given the parameters
@@ -287,15 +350,16 @@ namespace rus_namespace {
   // https://arxiv.org/abs/1509.07164
   template<typename T1, typename T2>
   inline Matrix<typename boost::math::tools::promote_args<T1, T2>::type, Dynamic, 1>
+<<<<<<< HEAD
   mech_rus(const int& P, const int& N,
+=======
+  mech_rus(const int& N,
+>>>>>>> spectra
            const Matrix<T1, Dynamic, 1>& lookup, // Constant data
            const Matrix<T2, Dynamic, Dynamic>& C, // Parameters
            std::ostream *stream) {
-    Matrix<double, Dynamic, 1> freqs(N, 1);
-
-    Matrix<double, Dynamic, 21> dfreqsdCij(N, 21);
-
-    Matrix<double, 6, 6> C_;
+    if(lookup.size() % 21 != 0)
+      throw std::runtime_error("lookup.size() must be a multiple of 21!");
 
     if(C.rows() != 6)
       throw std::runtime_error("Compliance matrix must have exactly 6 rows!");
@@ -303,26 +367,31 @@ namespace rus_namespace {
     if(C.cols() != 6)
       throw std::runtime_error
         ("Compliance matrix must have exactly 6 columns!");
-    
-    for(int i = 0; i < 6; i++)
-      for(int j = 0; j < 6; j++) {
-        C_(i, j) = value_of(C(i, j));
-      }
 
-    LLT< Matrix<double, 6, 6> > llt = C_.llt();
+    LLT< Matrix<double, Dynamic, Dynamic> > llt = value_of(C).llt();
     if(llt.info() == Eigen::NumericalIssue)
       throw std::domain_error
         ("Compliance matrix (C) non semi-positive definite!");
+
+    int Ksize = lookup.size() / 21;
+
+    VectorXd lookup_;
+    Matrix<T2, Dynamic, 1> C_;
+
+    flatten(Ksize, lookup, C, lookup_, C_);
+
+    Matrix<double, Dynamic, 1> freqs(N, 1);
+    MatrixXd dfreqsdCij(N, C_.size());
     
     //double tmp = omp_get_wtime();
     // This is the big custom function
-    mechanics(C_, // Params
-              P, lookup, N, // Ref data
+    mechanics(value_of(C_), // Params
+              lookup_, N, // Ref data
               freqs, // Output
               dfreqsdCij); // Gradients
 
     // Package up output (this will be different depending on the template
     // types of the inputs)
-    return build_output(C, freqs, dfreqsdCij);
+    return build_output(C_, freqs, dfreqsdCij);
   }
 }
