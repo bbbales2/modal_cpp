@@ -27,7 +27,7 @@ void mechanics(const VectorXd& C, //Changing parameters
                const VectorXd& lookup, int nevs, // Constants
                VectorXd& freqs,  // Output
                Matrix<double, Dynamic, Dynamic>& dfreqsdCij) { // Derivatives
-  double tmp = omp_get_wtime();
+  //double tmp = omp_get_wtime();
 
   int L = 1;
 
@@ -51,16 +51,16 @@ void mechanics(const VectorXd& C, //Changing parameters
 
     ij++;
   }
-  printf("Build matrix: %f\n", omp_get_wtime() - tmp);
+  //printf("Build matrix: %f\n", omp_get_wtime() - tmp);
   
-  tmp = omp_get_wtime();
+  //tmp = omp_get_wtime();
   Spectra::DenseSymShiftSolve<float> op(K);
   Spectra::SymEigsShiftSolver<float, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<float> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 2.0);
 
   // Initialize and compute
   esolve.init();
   int nconv = esolve.compute();
-  printf("Eigensolve: %f\n", omp_get_wtime() - tmp);
+  //printf("Eigensolve: %f\n", omp_get_wtime() - tmp);
 
   // Retrieve results
   if(esolve.info() != Spectra::SUCCESSFUL) {
@@ -70,7 +70,7 @@ void mechanics(const VectorXd& C, //Changing parameters
   VectorXd eigs(nevs);
   MatrixXf evecsr = esolve.eigenvectors();
   MatrixXd evecs(esolve.eigenvectors().rows(), nevs);
-  tmp = omp_get_wtime();
+  //tmp = omp_get_wtime();
 
   //std::cout << esolve.eigenvalues() << std::endl;
 
@@ -115,7 +115,7 @@ void mechanics(const VectorXd& C, //Changing parameters
   }
   
   //if(DEBUG)
-  printf("Output prep: %f\n", omp_get_wtime() - tmp);
+  //printf("Output prep: %f\n", omp_get_wtime() - tmp);
 }
 
 #endif
