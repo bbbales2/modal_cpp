@@ -350,11 +350,7 @@ namespace rus_namespace {
   // https://arxiv.org/abs/1509.07164
   template<typename T1, typename T2>
   inline Matrix<typename boost::math::tools::promote_args<T1, T2>::type, Dynamic, 1>
-<<<<<<< HEAD
-  mech_rus(const int& P, const int& N,
-=======
   mech_rus(const int& N,
->>>>>>> spectra
            const Matrix<T1, Dynamic, 1>& lookup, // Constant data
            const Matrix<T2, Dynamic, Dynamic>& C, // Parameters
            std::ostream *stream) {
