@@ -10,7 +10,7 @@ namespace rus_namespace {
   using namespace Eigen;
   using namespace stan::math;
 
-  int bilayer_size(const int& IN,
+  int bilayer_lookup_size(const int& IN,
                    const int& JN,
                    const int& KN, std::ostream* pstream__) {
     return computeBilayerSize(IN, JN, KN);
@@ -375,6 +375,141 @@ namespace rus_namespace {
     Matrix<T2, Dynamic, 1> C_;
 
     flatten(Ksize, lookup, C, lookup_, C_);
+
+    Matrix<double, Dynamic, 1> freqs(N, 1);
+    MatrixXd dfreqsdCij(N, C_.size());
+    
+    //double tmp = omp_get_wtime();
+    // This is the big custom function
+    mechanics(value_of(C_), // Params
+              lookup_, N, // Ref data
+              freqs, // Output
+              dfreqsdCij); // Gradients
+
+    // Package up output (this will be different depending on the template
+    // types of the inputs)
+    return build_output(C_, freqs, dfreqsdCij);
+  }
+
+  inline void bilayer_flatten(int Ksize,
+                              const Matrix<double, Dynamic, 1>& lookup, // Constant data
+                              const Matrix<var, Dynamic, Dynamic>& C1, // Parameters
+                              const Matrix<var, Dynamic, Dynamic>& C2,
+                              VectorXd& lookup_,
+                              Matrix<var, Dynamic, 1>& C_) {
+    std::map<vari *, var> unique;
+    std::map<vari *, VectorXd> lookup_map;
+    int ij = 0;
+    for(int i = 0; i < 6; i++) {
+      for(int j = 0; j < i + 1; j++) {
+        if(unique.find(C1(i, j).vi_) == unique.end()) {
+          unique[C1(i, j).vi_] = C1(i, j);
+          lookup_map[C1(i, j).vi_] = VectorXd::Zero(Ksize);
+        }
+        for(int k = 0; k < Ksize; k++) {
+          lookup_map[C1(i, j).vi_](k) += lookup[ij * Ksize + k];
+        }
+        ij += 1;
+      }
+    }
+    for(int i = 0; i < 6; i++) {
+      for(int j = 0; j < i + 1; j++) {
+        if(unique.find(C2(i, j).vi_) == unique.end()) {
+          unique[C2(i, j).vi_] = C2(i, j);
+          lookup_map[C2(i, j).vi_] = VectorXd::Zero(Ksize);
+        }
+        for(int k = 0; k < Ksize; k++) {
+          lookup_map[C2(i, j).vi_](k) += lookup[ij * Ksize + k];
+        }
+        ij += 1;
+      }
+    }
+    C_.resize(unique.size());
+    lookup_.resize(Ksize * unique.size());
+    
+    int i = 0;
+    for(auto&& it : unique) {
+      C_(i) = it.second;
+      for(int j = 0; j < Ksize; j++) {
+        lookup_[i * Ksize + j] = lookup_map[it.first](j);
+      }
+      i += 1;
+    }
+  }
+
+  inline void bilayer_flatten(int Ksize,
+                              const Matrix<double, Dynamic, 1>& lookup, // Constant data
+                              const Matrix<double, Dynamic, Dynamic>& C1, // Parameters
+                              const Matrix<double, Dynamic, Dynamic>& C2,
+                              VectorXd& dfreqsdCij,
+                              VectorXd& C_) {
+    dfreqsdCij = lookup;
+    C_.resize(21 * 2);
+    int ij = 0;
+    for(int i = 0; i < 6; i++) {
+      for(int j = 0; j < i + 1; j++) {
+        C_(ij) = C1(i, j);
+        ij += 1;
+      }
+    }
+    for(int i = 0; i < 6; i++) {
+      for(int j = 0; j < i + 1; j++) {
+        C_(ij) = C2(i, j);
+        ij += 1;
+      }
+    }
+  }
+
+  // Compute the resonance frequencies given the parameters
+  //
+  // We won't be able to use Stan's autodiff here, so we'll have to define the
+  // necessary specializations
+  //
+  // This is the function takes in some stan::math::var s and spits out some
+  // more vars with gradient information embedded in them for the backwards autodiff.
+  //
+  // The Stan paper has a good description of how this works
+  // https://arxiv.org/abs/1509.07164
+  template<typename T1, typename T2>
+  inline Matrix<typename boost::math::tools::promote_args<T1, T2>::type, Dynamic, 1>
+  bilayer_rus(const int& N,
+              const Matrix<T1, Dynamic, 1>& lookup, // Constant data
+              const Matrix<T2, Dynamic, Dynamic>& C1, // Parameters
+              const Matrix<T2, Dynamic, Dynamic>& C2, // Parameters
+              std::ostream* stream) {
+    if(lookup.size() % (21 * 2) != 0)
+      throw std::runtime_error("lookup.size() must be a multiple of 21!");
+
+    if(C1.rows() != 6)
+      throw std::runtime_error("Compliance matrix 1 must have exactly 6 rows!");
+
+    if(C2.rows() != 6)
+      throw std::runtime_error("Compliance matrix 2 must have exactly 6 rows!");
+
+    if(C1.cols() != 6)
+      throw std::runtime_error
+        ("Compliance matrix 1 must have exactly 6 columns!");
+
+    if(C2.cols() != 6)
+      throw std::runtime_error
+        ("Compliance matrix 2 must have exactly 6 columns!");
+
+    LLT< Matrix<double, Dynamic, Dynamic> > llt1 = value_of(C1).llt();
+    if(llt1.info() == Eigen::NumericalIssue)
+      throw std::domain_error
+        ("Compliance matrix (C1) non semi-positive definite!");
+
+    LLT< Matrix<double, Dynamic, Dynamic> > llt2 = value_of(C1).llt();
+      if(llt2.info() == Eigen::NumericalIssue)
+        throw std::domain_error
+          ("Compliance matrix (C2) non semi-positive definite!");
+
+    int Ksize = lookup.size() / (21 * 2);
+
+    VectorXd lookup_;
+    Matrix<T2, Dynamic, 1> C_;
+
+    bilayer_flatten(Ksize, lookup, C1, C2, lookup_, C_);
 
     Matrix<double, Dynamic, 1> freqs(N, 1);
     MatrixXd dfreqsdCij(N, C_.size());

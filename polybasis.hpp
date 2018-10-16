@@ -48,7 +48,7 @@ int computeBilayerSize(const int& IN, const int& JN, const int& KN) {
     }
   }
   
-  return 3 * 3 * m * m;
+  return 3 * 3 * m * m * 21 * 2;
 }
 
 // This file contains some helper functions which build the lookup tables necessary for solving for the resonance modes of the material
@@ -146,14 +146,14 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
   std::vector<double> densities = { bulk_density, layer_density };
 
   layer_index = layer_index - 1;
-  
+
   Eigen::VectorXd bp(3 * 2 * 3 * 2); // 3 x 2 x 3 x 2
   auto bp_idx = [](int i, int j, int k, int l) {
     return i + 3 * j + 3 * 2 * k + 3 * 2 * 3 * l;
   };
   for(int i = 0; i < bp.size(); i++)
     bp(i) = bp_[i];
-  
+
   std::vector<std::array<int, 3> > ntoijk;
   std::vector<int> ntom;
   std::vector<int> nlength;
@@ -186,7 +186,7 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
 
   int N = ntoijk.size();
   int M = m;
-  
+
   Eigen::VectorXd dinp = Eigen::VectorXd::Zero(2 * M * M * 3 * 3); // 2 x M x M x 3 x 3
   auto dinp_idx = [M](int i, int j, int k, int l, int m) {
     return i + j * 2 + k * 2 * M + l * 2 * M * M + m * 2 * M * M * 3;
@@ -196,8 +196,6 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
     return i + j * 2 + k * 2 * M;
   };
 
-  //std::cout << "N: " << N << std::endl;
-  
   for(int ii = 0; ii < 2; ii++) {
     for(int n0 = 0; n0 < N; n0++) {
       for(int n1 = 0; n1 < N; n1++) {
@@ -274,7 +272,7 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
       }
     }
   }
-  
+
   Eigen::VectorXd dKdcij = Eigen::VectorXd::Zero(3 * M * 3 * M * 6 * 6 * 2); // 3 * M x 3 * M x 6 x 6 x 2
   auto dKdcij_idx = [M](int i, int j, int k, int l, int m) {
     return i + j * 3 * M + k * 3 * M * 3 * M + l * 3 * M * 3 * M * 6 + m * 3 * M * 3 * M * 6 * 6;
@@ -305,7 +303,7 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
         }
       }
     }
-    
+
     for(int m0 = 0; m0 < M; m0++) {
       for(int m1 = 0; m1 < M; m1++) {
         for(int i = 0; i < 3; i++) {
@@ -314,22 +312,22 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
       }
     }
   }
-  
+
   Eigen::LLT<Eigen::MatrixXd> Wc = W.llt();
-  
+
   Eigen::VectorXd dKhatdcij = Eigen::VectorXd::Zero(3 * M * 3 * M * 21 * 2); // 3 * M x 3 * M x 21 x 2
-  int ij = 0;
   for(int ii = 0; ii < 2; ii++) {
+    int ij = 0;
     for(int p = 0; p < 6; p++) {
       for(int q = 0; q < p + 1; q++) {
         Eigen::Map<Eigen::MatrixXd> dKtmp(&dKdcij(dKdcij_idx(0, 0, p, q, ii)), 3 * M, 3 * M);
-        Eigen::Map<Eigen::MatrixXd> dKhattmp(&dKhatdcij(3 * M * 3 * M * (ij * 21 * ii)), 3 * M, 3 * M);
+        Eigen::Map<Eigen::MatrixXd> dKhattmp(&dKhatdcij(3 * M * 3 * M * (ij + 21 * ii)), 3 * M, 3 * M);
         dKhattmp = Wc.matrixL().solve(Wc.matrixL().solve(dKtmp.transpose()).transpose());
         ij += 1;
       }
     }
   }
-  
+
   return dKhatdcij;
 }
 
