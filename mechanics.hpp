@@ -11,6 +11,70 @@
 
 #include "util.hpp"
 
+// Lapack dense symmetric eigensolve
+/*extern "C" void dsyevx_(const char *jobz,
+                        const char *range,
+                        const char *uplo,
+                        int *N,
+                        double *A,
+                        int *lda,
+                        double *vl,
+                        double *vu,
+                        int *il,
+                        int *iu,
+                        double *abstol,
+                        int *M,
+                        double *W,
+                        double *Z,
+                        int *ldz,
+                        double *work,
+                        int *lwork,
+                        int *iwork,
+                        int *ifail,
+                        int *info);
+
+// Wrap up the eigensolver in a C++ function
+void eigSolve(const MatrixXd &A, int il, int iu, VectorXd& eigs, MatrixXd& evecs) {
+  MatrixXd At = A;
+  
+  il += 1;
+  iu += 1;
+  
+  int N = A.rows();
+  int lda = N;
+  int ldz = N;
+  double abstol = 1e-13;//-11e-13;
+  int M = 0;
+  VectorXd W(N);
+  eigs.resize(iu - il + 1);
+  evecs.resize(N, iu - il + 1);
+  std::vector<int> iwork(5 * N);
+  std::vector<int> ifail(N);
+  int info = 0;
+  double zero = 0.0;
+  double workQuery = 0.0;
+  int lworkQuery = -1;
+
+  //double tmp = omp_get_wtime();
+  
+  // First call computes optimal workspace storage size
+  dsyevx_("V", "I", "U", &N, At.data(), &lda, &zero, &zero, &il, &iu, &abstol, &M, W.data(), evecs.data(), &ldz, &workQuery, &lworkQuery, &iwork[0], &ifail[0], &info);
+
+  //printf("Info %d, M %d, opt %f, %f\n", info, M, workQuery, omp_get_wtime() - tmp);
+
+  int lwork = int(workQuery) + 1;
+  std::vector<double> work(lwork);
+  
+  //tmp = omp_get_wtime();
+  // Second call actually computes the eigenvalues and eigenvectors!
+  dsyevx_("V", "I", "U", &N, At.data(), &lda, &zero, &zero, &il, &iu, &abstol, &M, W.data(), evecs.data(), &ldz, &work[0], &lwork, &iwork[0], &ifail[0], &info);
+
+  eigs = W.segment(0, iu - il + 1);
+  //evecs /= sqrt(max);
+
+  //printf("Info %d, M %d, opt %f, %f\n", info, M, work[0], omp_get_wtime() - tmp);
+  }*/
+
 // Mechanics solver
 //   This takes in the parameters, some lookup tables, and some constants
 //   and outputs the resonance modes and all the derivatives of the
@@ -48,6 +112,7 @@ void mechanics(const VectorXd& C, //Changing parameters
     for(int l = 0; l < K.size(); l++)
       K(l) += dKdcij(l) * C(i);
   }
+
   //printf("Build matrix: %f\n", omp_get_wtime() - tmp);
   
   //tmp = omp_get_wtime();
@@ -67,6 +132,16 @@ void mechanics(const VectorXd& C, //Changing parameters
   VectorXd eigs(nevs);
   MatrixXd evecsr = esolve.eigenvectors();
   MatrixXd evecs(esolve.eigenvectors().rows(), nevs);
+
+  for(int i = 0; i < nevs; i++) {
+    eigs(i) = esolve.eigenvalues()(nevs - i - 1);
+    for(int j = 0; j < evecs.rows(); j++) {
+      evecs(j, i) = evecsr(j, nevs - i - 1);
+    }
+  }
+    /*VectorXd eigs;
+  MatrixXd evecs;
+  eigSolve(K, 6, 6 + nevs - 1, eigs, evecs);*/
   //tmp = omp_get_wtime();
 
   //std::cout << esolve.eigenvalues() << std::endl;
@@ -77,13 +152,6 @@ void mechanics(const VectorXd& C, //Changing parameters
 
   //for(int i = 0; i < 6 + nevs; i++)
   //  std::cout << es.eigenvalues()(i) << std::endl;
-
-  for(int i = 0; i < nevs; i++) {
-    eigs(i) = esolve.eigenvalues()(nevs - i - 1);
-    for(int j = 0; j < evecs.rows(); j++) {
-      evecs(j, i) = evecsr(j, nevs - i - 1);
-    }
-  }
 
   int N = K.rows();
 
@@ -98,7 +166,7 @@ void mechanics(const VectorXd& C, //Changing parameters
 
     dKdcij_evecs.push_back(dKdcij * evecs);
   }
-  
+
   for(int k = 0; k < nevs; k++) {
     freqs(k) = sqrt(eigs(k) * 1.0e11) / (M_PI * 2000.0);
     double dfde = 0.5e11 / (sqrt(eigs(k) * 1.0e11) * M_PI * 2000.0);
