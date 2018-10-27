@@ -12,7 +12,7 @@
 #include "util.hpp"
 
 // Lapack dense symmetric eigensolve
-/*extern "C" void dsyevx_(const char *jobz,
+extern "C" void dsyevx_(const char *jobz,
                         const char *range,
                         const char *uplo,
                         int *N,
@@ -73,7 +73,7 @@ void eigSolve(const MatrixXd &A, int il, int iu, VectorXd& eigs, MatrixXd& evecs
   //evecs /= sqrt(max);
 
   //printf("Info %d, M %d, opt %f, %f\n", info, M, work[0], omp_get_wtime() - tmp);
-  }*/
+}
 
 // Mechanics solver
 //   This takes in the parameters, some lookup tables, and some constants
@@ -116,7 +116,7 @@ void mechanics(const VectorXd& C, //Changing parameters
   //printf("Build matrix: %f\n", omp_get_wtime() - tmp);
   
   //tmp = omp_get_wtime();
-  Spectra::DenseSymShiftSolve<double> op(K);
+  /*Spectra::DenseSymShiftSolve<double> op(K);
   Spectra::SymEigsShiftSolver<double, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<double> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 2.0);
 
   // Initialize and compute
@@ -138,10 +138,10 @@ void mechanics(const VectorXd& C, //Changing parameters
     for(int j = 0; j < evecs.rows(); j++) {
       evecs(j, i) = evecsr(j, nevs - i - 1);
     }
-  }
-    /*VectorXd eigs;
+    }*/
+  VectorXd eigs;
   MatrixXd evecs;
-  eigSolve(K, 6, 6 + nevs - 1, eigs, evecs);*/
+  eigSolve(K, 6, 6 + nevs - 1, eigs, evecs);
   //tmp = omp_get_wtime();
 
   //std::cout << esolve.eigenvalues() << std::endl;

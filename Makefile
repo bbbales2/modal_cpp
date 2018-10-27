@@ -1,5 +1,5 @@
 CPPFLAGS=-fopenmp -Ispectra/include/Spectra -I../../stan/lib/stan_math/lib/boost_1.66.0 -I../../stan/lib/stan_math/lib/eigen_3.3.3/ -I../../stan/lib/stan_math/ -I../../stan/lib/stan_math/lib/sundials_3.1.0/include/ --std=c++1y -g -O3 -msse
-LFLAGS=-fopenmp
+LFLAGS=-fopenmp -llapack
 DEPS=util.hpp mechanics.hpp stan_mech.hpp polybasis.hpp
 SOURCES=stan_test.cpp stan_test_r.cpp cu2qu.cpp
 CC=clang++
