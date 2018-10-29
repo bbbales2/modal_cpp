@@ -152,5 +152,35 @@ int main() {
     std::cout << "Failed c11 reference gradient check" << std::endl;
   else
     std::cout << "Passed c11 reference gradient check" << std::endl;
+
+  failed = false;
+
+  VectorXd refc12(N);
+
+  refc12 << -0.503395, -48.0169, -49.5532, -7.44497,
+    -95.8234, -5.91993, -17.295, -24.7766, -59.6339,
+    -22.8485, -120.672, -101.35, -5.10607, -67.289,
+    -144.439, -63.3056, -143.012, -91.2816, -10.6521,
+    -79.2997, -66.982, -40.6559, -91.408, -46.5387,
+    -84.0838, -62.4809, -154.166, -127.356, -105.808,
+    -51.7811;
+  
+  for(int i = 0; i < N; i++) {
+    set_zero_all_adjoints();
+    
+    v1(i).grad();
+
+    std::cout << c12.adj() << ", " << refc12(i) << std::endl;
+
+    if(std::abs((c12.adj() - refc12(i)) / c12.adj()) > tol) {
+      failed = true;
+      break;
+    }
+  }
+
+  if(failed)
+    std::cout << "Failed c12 reference gradient check" << std::endl;
+  else
+    std::cout << "Passed c12 reference gradient check" << std::endl;
 }
 

@@ -117,7 +117,7 @@ void mechanics(const VectorXd& C, //Changing parameters
   for(int i = 0; i < K.size(); i++) {
     total += std::abs(K(i));
   }
-  std::cout << C.size() << " total: " << total << std::endl;
+  //std::cout << C.size() << " total: " << total << std::endl;
 
   //printf("Build matrix: %f\n", omp_get_wtime() - tmp);
   

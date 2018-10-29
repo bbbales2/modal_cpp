@@ -478,7 +478,7 @@ namespace rus_namespace {
               const Matrix<T2, Dynamic, Dynamic>& C1, // Parameters
               const Matrix<T2, Dynamic, Dynamic>& C2, // Parameters
               std::ostream* stream) {
-    if(lookup.size() % (21 * 2) != 0)
+    if(lookup.size() % (36 * 2) != 0)
       throw std::runtime_error("lookup.size() must be a multiple of 21!");
 
     if(C1.rows() != 6)
@@ -507,10 +507,15 @@ namespace rus_namespace {
 
     int Ksize = lookup.size() / (21 * 2);
 
-    VectorXd lookup_;
-    Matrix<T2, Dynamic, 1> C_;
+    VectorXd lookup_ = lookup;
+    Matrix<T2, Dynamic, 1> C_(C1.size() + C2.size());
 
-    bilayer_flatten(Ksize, lookup, C1, C2, lookup_, C_);
+    for(int i = 0; i< C1.size(); i++) {
+      C_(i) = C1(i);
+      C_(36 + i) = C2(i);
+    }
+
+    //bilayer_flatten(Ksize, lookup, C1, C2, lookup_, C_);
 
     Matrix<double, Dynamic, 1> freqs(N, 1);
     MatrixXd dfreqsdCij(N, C_.size());

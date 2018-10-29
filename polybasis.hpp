@@ -48,7 +48,7 @@ int computeBilayerSize(const int& IN, const int& JN, const int& KN) {
     }
   }
   
-  return 3 * 3 * m * m * 21 * 2;
+  return 3 * 3 * m * m * 36 * 2;
 }
 
 // This file contains some helper functions which build the lookup tables necessary for solving for the resonance modes of the material
@@ -281,10 +281,9 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
   
   for(int ii = 0; ii < 2; ii++) {
     for(int p = 0; p < 6; p++) {
-      for(int q = 0; q < p + 1; q++) {
+      for(int q = 0; q < 6; q++) {
         Eigen::MatrixXd cm = Eigen::MatrixXd::Zero(6, 6);
         cm(p, q) = 1.0;
-        cm(q, p) = 1.0;
         Eigen::Matrix<double, 9, 9> c = voigt(cm);
         for(int m0 = 0; m0 < M; m0++) {
           for(int m1 = 0; m1 < M; m1++) {
@@ -316,13 +315,13 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
 
   Eigen::LLT<Eigen::MatrixXd> Wc = W.llt();
 
-  Eigen::VectorXd dKhatdcij = Eigen::VectorXd::Zero(3 * M * 3 * M * 21 * 2); // 3 * M x 3 * M x 21 x 2
+  Eigen::VectorXd dKhatdcij = Eigen::VectorXd::Zero(3 * M * 3 * M * 36 * 2); // 3 * M x 3 * M x 36 x 2
   for(int ii = 0; ii < 2; ii++) {
     int ij = 0;
     for(int p = 0; p < 6; p++) {
-      for(int q = 0; q < p + 1; q++) {
+      for(int q = 0; q < 6; q++) {
         Eigen::Map<Eigen::MatrixXd> dKtmp(&dKdcij(dKdcij_idx(0, 0, p, q, ii)), 3 * M, 3 * M);
-        Eigen::Map<Eigen::MatrixXd> dKhattmp(&dKhatdcij(3 * M * 3 * M * (ij + 21 * ii)), 3 * M, 3 * M);
+        Eigen::Map<Eigen::MatrixXd> dKhattmp(&dKhatdcij(3 * M * 3 * M * (p + q * 6 + 36 * ii)), 3 * M, 3 * M);
         dKhattmp = Wc.matrixL().solve(Wc.matrixL().solve(dKtmp.transpose()).transpose());
         ij += 1;
       }
