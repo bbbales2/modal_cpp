@@ -500,7 +500,7 @@ namespace rus_namespace {
       throw std::domain_error
         ("Compliance matrix (C1) non semi-positive definite!");
 
-    LLT< Matrix<double, Dynamic, Dynamic> > llt2 = value_of(C1).llt();
+    LLT< Matrix<double, Dynamic, Dynamic> > llt2 = value_of(C2).llt();
       if(llt2.info() == Eigen::NumericalIssue)
         throw std::domain_error
           ("Compliance matrix (C2) non semi-positive definite!");

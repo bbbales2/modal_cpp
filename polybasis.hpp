@@ -281,9 +281,10 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
   
   for(int ii = 0; ii < 2; ii++) {
     for(int p = 0; p < 6; p++) {
-      for(int q = 0; q < 6; q++) {
+      for(int q = 0; q < p + 1; q++) {
         Eigen::MatrixXd cm = Eigen::MatrixXd::Zero(6, 6);
         cm(p, q) = 1.0;
+        cm(q, p) = 1.0;
         Eigen::Matrix<double, 9, 9> c = voigt(cm);
         for(int m0 = 0; m0 < M; m0++) {
           for(int m1 = 0; m1 < M; m1++) {

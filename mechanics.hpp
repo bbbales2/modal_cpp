@@ -113,11 +113,17 @@ void mechanics(const VectorXd& C, //Changing parameters
       K(l) += dKdcij(l) * C(i);
   }
 
+  double total = 0.0;
+  for(int i = 0; i < K.size(); i++) {
+    total += std::abs(K(i));
+  }
+  std::cout << C.size() << " total: " << total << std::endl;
+
   //printf("Build matrix: %f\n", omp_get_wtime() - tmp);
   
   //tmp = omp_get_wtime();
   /*Spectra::DenseSymShiftSolve<double> op(K);
-  Spectra::SymEigsShiftSolver<double, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<double> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 2.0);
+  Spectra::SymEigsShiftSolver<double, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<double> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 0.01);
 
   // Initialize and compute
   esolve.init();
