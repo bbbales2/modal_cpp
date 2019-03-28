@@ -113,17 +113,9 @@ void mechanics(const VectorXd& C, //Changing parameters
       K(l) += dKdcij(l) * C(i);
   }
 
-  double total = 0.0;
-  for(int i = 0; i < K.size(); i++) {
-    total += std::abs(K(i));
-  }
-  //std::cout << C.size() << " total: " << total << std::endl;
-
-  //printf("Build matrix: %f\n", omp_get_wtime() - tmp);
-  
   //tmp = omp_get_wtime();
-  /*Spectra::DenseSymShiftSolve<double> op(K);
-  Spectra::SymEigsShiftSolver<double, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<double> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 0.01);
+  Spectra::DenseSymShiftSolve<double> op(K);
+  Spectra::SymEigsShiftSolver<double, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<double> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 1e-4);
 
   // Initialize and compute
   esolve.init();
@@ -139,18 +131,28 @@ void mechanics(const VectorXd& C, //Changing parameters
   MatrixXd evecsr = esolve.eigenvectors();
   MatrixXd evecs(esolve.eigenvectors().rows(), nevs);
 
+  for(int i = 0; i < 6; i++) {
+    if(esolve.eigenvalues()(6 + nevs - i - 1) > 1e-6) {
+      std::cout << "Eigenvalue " << i << " is " << esolve.eigenvalues()(6 + nevs - i - 1) << " (should be near zero -- tolerance is 1e-6)" <<std::endl;
+      throw std::runtime_error("Less than six zero eigenvalues. Something has gone wrong");
+    }
+  }
+  
   for(int i = 0; i < nevs; i++) {
     eigs(i) = esolve.eigenvalues()(nevs - i - 1);
     for(int j = 0; j < evecs.rows(); j++) {
       evecs(j, i) = evecsr(j, nevs - i - 1);
     }
-    }*/
-  VectorXd eigs;
-  MatrixXd evecs;
-  eigSolve(K, 6, 6 + nevs - 1, eigs, evecs);
+  }
+  
+  //VectorXd eigs;
+  //MatrixXd evecs;
+  //eigSolve(K, 6, 6 + nevs - 1, eigs, evecs);
   //tmp = omp_get_wtime();
 
-  //std::cout << esolve.eigenvalues() << std::endl;
+  //std::cout << "its: " << esolve.num_iterations() << std::endl;
+  //std::cout << "ops: " << esolve.num_operations() << std::endl;
+  //std::cout << esolve.eigenvalues().transpose() << std::endl;
 
   //std::cout << "====" << std::endl;
   

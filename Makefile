@@ -2,8 +2,8 @@ CPPFLAGS=-fopenmp -Ispectra/include/Spectra -I../../stan/lib/stan_math/lib/boost
 LFLAGS=-fopenmp -llapack
 DEPS=util.hpp mechanics.hpp stan_mech.hpp polybasis.hpp
 SOURCES=stan_test.cpp stan_test_2.cpp bilayer_test.cpp stan_test_r.cpp cu2qu.cpp
-CC=clang++
-LINK=clang++
+CC=g++
+LINK=g++
 
 .PHONY: clean all
 
