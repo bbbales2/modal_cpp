@@ -4,6 +4,7 @@
 
 #include "util.hpp"
 #include "polybasis.hpp"
+#include "mechanics.hpp"
 #include "stan_mech.hpp"
 
 const double X = 0.007753,
@@ -67,13 +68,11 @@ int main() {
   bool failed = false;
 
   for(int i = 0; i < N; i++) {
-    std::cout << "Computed: " << v1(i).val() << ", reference: " << ref(i);
+    std::cout << "Computed: " << v1(i).val() << ", reference: " << ref(i) << std::endl;
     if(std::abs(v1(i).val() - ref(i)) / ref(i) > tol) {
       failed = true;
-      std::cout << " *";
-      //break;
+      break;
     }
-    std::cout << std::endl;
   }
 
   if(failed)
@@ -141,15 +140,12 @@ int main() {
     
     v1(i).grad();
 
-    std::cout << c11.adj() << ", " << refc11(i);
+    std::cout << c11.adj() << ", " << refc11(i) << std::endl;
 
     if(std::abs((c11.adj() - refc11(i)) / c11.adj()) > tol) {
       failed = true;
-      std::cout << " *";
-      //break;
+      break;
     }
-
-    std::cout << std::endl;
   }
 
   if(failed)
@@ -174,15 +170,12 @@ int main() {
     
     v1(i).grad();
 
-    std::cout << c12.adj() << ", " << refc12(i);
+    std::cout << c12.adj() << ", " << refc12(i) << std::endl;
 
     if(std::abs((c12.adj() - refc12(i)) / c12.adj()) > tol) {
       failed = true;
-      std::cout << " *";
-      //break;
+      break;
     }
-
-    std::cout << std::endl;
   }
 
   if(failed)

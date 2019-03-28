@@ -1,12 +1,9 @@
 #ifndef polybasis_hpp_
 #define polybasis_hpp_
 
-#include <SymEigsShiftSolver.h>
 #include <vector>
 #include <cmath>
 #include <Eigen/Core>
-#include <Eigen/LU>
-#include <Eigen/Dense>
 
 #include "util.hpp"
 
@@ -389,6 +386,87 @@ double polyint(int n, int m, int l)
   return 2.0 * pow(0.5, l + 1) * ytmp / ((n + 1) * (m + 1) * (l + 1));
 }
 
+void buildBasis(int P, double X, double Y, double Z, double density, Matrix<double, Dynamic, 1>& lookup) {
+  std::vector<int> ns, ms, ls;
+
+  for(int i = 0; i < P + 1; i++)
+    for(int j = 0; j < P + 1; j++)
+      for(int k = 0; k < P + 1; k++)
+        if(i + j + k <= P) {
+          ns.push_back(i);
+          ms.push_back(j);
+          ls.push_back(k);
+        }
+
+  int L = ns.size();
+
+  if(L != (P + 1) * (P + 2) * (P + 3) / 6)
+    throw std::logic_error("This should never happen. Make sure P is even. P = 10 or P = 12 should work");
+
+  lookup.resize(L * L * 3 * 3 * 21);
+
+  Matrix<double, Dynamic, 1> dp(L * L * 3 * 3);
+  Matrix<double, Dynamic, Dynamic> pv(L, L);
+
+  std::vector<double> Xs(2 * P + 3, 0.0),
+    Ys(2 * P + 3, 0.0),
+    Zs(2 * P + 3, 0.0);
+
+  for(int i = -1; i < 2 * P + 2; i++) {
+    Xs[i + 1] = pow(X, i);
+    Ys[i + 1] = pow(Y, i);
+    Zs[i + 1] = pow(Z, i);
+  }
+
+  //pragma omp parallel for
+  for(int i = 0; i < ns.size(); i++) {
+    for(int j = 0; j < ns.size(); j++) {
+      int n0 = ns[i],
+        m0 = ms[i],
+        l0 = ls[i],
+        n1 = ns[j],
+        m1 = ms[j],
+        l1 = ls[j];
+
+      Map< Matrix<double, 3, 3> > dpm(&dp.data()[i * 3 * 3 + j * ns.size() * 3 * 3]);
+
+      dpm(0, 0) = Xs[n1 + n0] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 2, m1 + m0, l1 + l0) * n0 * n1;
+      dpm(0, 1) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 1, m1 + m0 - 1, l1 + l0) * n0 * m1;
+      dpm(0, 2) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 1] * polyint(n1 + n0 - 1, m1 + m0, l1 + l0 - 1) * n0 * l1;
+
+      dpm(1, 0) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 1, m1 + m0 - 1, l1 + l0) * m0 * n1;
+      dpm(1, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0 - 2, l1 + l0) * m0 * m1;
+      dpm(1, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * m0 * l1;
+
+      dpm(2, 0) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 1] * polyint(n1 + n0 - 1, m1 + m0, l1 + l0 - 1) * l0 * n1;
+      dpm(2, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * l0 * m1;
+      dpm(2, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 ] * polyint(n1 + n0, m1 + m0, l1 + l0 - 2) * l0 * l1;
+
+      pv(i, j) = density * Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0, l1 + l0);
+    }
+  }
+
+  LLT< MatrixXd > M = buildM(P, pv).llt();
+
+  int ij = 0;
+  for(int i = 0; i < 6; i++) {
+    for(int j = 0; j < i + 1; j++) {
+      Map< Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[ij * L * L * 3 * 3], 3 * L, 3 * L);
+
+      Matrix<double, 6, 6> dCdcij = Matrix<double, 6, 6>::Zero();
+        
+      dCdcij(i, j) = 1.0;
+      dCdcij(j, i) = 1.0;
+        
+      MatrixXd dKtmp = buildK(P, dCdcij, dp);
+
+      dKdcij = M.matrixL().solve(M.matrixL().solve(dKtmp.transpose()).transpose());
+      
+      ij++;
+    }
+  }
+}
+
 Matrix<double, 6, 6> unvoigt(const Matrix<double, 9, 9>& Ch) {
   Matrix<double, 6, 6> C;
 
@@ -552,191 +630,26 @@ void buildRotate(const Matrix<double, 6, 6>& Ch, double w, double x, double y, d
   dCrdz = drotate(Ch, Q, dQdz);
 }
 
-static std::vector< MatrixXd > dKdcijs;
+void buildKM(int P, const Matrix<double, 6, 6>& Ch, const Matrix<double, Dynamic, 1>& lookup, MatrixXd& K_, MatrixXd& M_) {
+  int L = (P + 1) * (P + 2) * (P + 3) / 6;
 
-void buildBasis(int P, double X, double Y, double Z, double density, Matrix<double, Dynamic, 1>& lookup) {
-  std::vector<int> ns, ms, ls;
-
-  for(int i = 0; i < P + 1; i++)
-    for(int j = 0; j < P + 1; j++)
-      for(int k = 0; k < P + 1; k++)
-        if(i + j + k <= P) {
-          ns.push_back(i);
-          ms.push_back(j);
-          ls.push_back(k);
-        }
-
-  int L = ns.size();
-
-  if(L != (P + 1) * (P + 2) * (P + 3) / 6)
-    throw std::logic_error("This should never happen. Make sure P is even. P = 10 or P = 12 should work");
-
-  lookup.resize(L * L * 3 * 3 * 21);
-
-  Matrix<double, Dynamic, 1> dp(L * L * 3 * 3);
-  Matrix<double, Dynamic, Dynamic> pv(L, L);
-
-  std::vector<double> Xs(2 * P + 3, 0.0),
-    Ys(2 * P + 3, 0.0),
-    Zs(2 * P + 3, 0.0);
-
-  for(int i = -1; i < 2 * P + 2; i++) {
-    Xs[i + 1] = pow(X, i);
-    Ys[i + 1] = pow(Y, i);
-    Zs[i + 1] = pow(Z, i);
-  }
-
-  //pragma omp parallel for
-  for(int i = 0; i < ns.size(); i++) {
-    for(int j = 0; j < ns.size(); j++) {
-      int n0 = ns[i],
-        m0 = ms[i],
-        l0 = ls[i],
-        n1 = ns[j],
-        m1 = ms[j],
-        l1 = ls[j];
-
-      Map< Matrix<double, 3, 3> > dpm(&dp.data()[i * 3 * 3 + j * ns.size() * 3 * 3]);
-
-      dpm(0, 0) = Xs[n1 + n0] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 2, m1 + m0, l1 + l0) * n0 * n1;
-      dpm(0, 1) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 1, m1 + m0 - 1, l1 + l0) * n0 * m1;
-      dpm(0, 2) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 1] * polyint(n1 + n0 - 1, m1 + m0, l1 + l0 - 1) * n0 * l1;
-
-      dpm(1, 0) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 2] * polyint(n1 + n0 - 1, m1 + m0 - 1, l1 + l0) * m0 * n1;
-      dpm(1, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0 - 2, l1 + l0) * m0 * m1;
-      dpm(1, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * m0 * l1;
-
-      dpm(2, 0) = Xs[n1 + n0 + 1] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 1] * polyint(n1 + n0 - 1, m1 + m0, l1 + l0 - 1) * l0 * n1;
-      dpm(2, 1) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 1] * Zs[l1 + l0 + 1] * polyint(n1 + n0, m1 + m0 - 1, l1 + l0 - 1) * l0 * m1;
-      dpm(2, 2) = Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 ] * polyint(n1 + n0, m1 + m0, l1 + l0 - 2) * l0 * l1;
-
-      pv(i, j) = density * Xs[n1 + n0 + 2] * Ys[m1 + m0 + 2] * Zs[l1 + l0 + 2] * polyint(n1 + n0, m1 + m0, l1 + l0);
-    }
-  }
-
-  LLT< MatrixXd > M = buildM(P, pv).llt();
-  dKdcijs.resize(21);
+  K_.resize(L * 3, L * 3);
+  K_.setZero();
   
   int ij = 0;
   for(int i = 0; i < 6; i++) {
     for(int j = 0; j < i + 1; j++) {
-      Matrix<double, 6, 6> dCdcij = Matrix<double, 6, 6>::Zero();
-        
-      dCdcij(i, j) = 1.0;
-      dCdcij(j, i) = 1.0;
-        
-      MatrixXd dKtmp = buildK(P, dCdcij, dp);
+      Map< const Matrix<double, Dynamic, Dynamic> > dKdcij(&lookup.data()[L * L * 3 * 3 + L * L + ij * L * L * 3 * 3], 3 * L, 3 * L);
 
-      dKdcijs[ij] = M.matrixL().solve(M.matrixL().solve(dKtmp.transpose()).transpose());
+      K_ += dKdcij * Ch(i, j);
+
       ij++;
     }
   }
-}
 
-void mechanics(const VectorXd& C, //Changing parameters
-               const VectorXd& lookup, int nevs, // Constants
-               VectorXd& freqs,  // Output
-               Matrix<double, Dynamic, Dynamic>& dfreqsdCij) { // Derivatives
-  double tmp = omp_get_wtime();
+  Map< const Matrix<double, Dynamic, Dynamic> > M(&lookup.data()[L * L * 3 * 3 + L * L + 21 * L * L * 3 * 3], L * 3, L * 3);
 
-  int L = 1;
-
-  for(L = 1; L < lookup.size(); L++) {
-    if(3 * 3 * L * L * C.size() == lookup.size()) {
-      break;
-    }
-  }
-  
-  if(L == lookup.size())
-    throw std::runtime_error("Solve for L in 3 * 3 * L * L * C.size() == lookup.size() failed");
-
-  MatrixXd K = MatrixXd::Zero(3 * L, 3 * L);
-
-  for(int ij = 0; ij < C.size(); ij++) {
-    const MatrixXd& dKdcij = dKdcijs[ij];
-
-    for(int l = 0; l < K.size(); l++)
-      K(l) += dKdcij(l) * C(ij);
-  }
-
-  //std::cout << C.size() << " total: " << total << std::endl;
-
-  //printf("Build matrix: %f\n", omp_get_wtime() - tmp);
-  
-  tmp = omp_get_wtime();
-  Spectra::DenseSymShiftSolve<double> op(K);
-  Spectra::SymEigsShiftSolver<double, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<double> > esolve(&op, 6 + nevs, 12 + 2 * nevs, 1e-4);
-
-  // Initialize and compute
-  esolve.init();
-  int nconv = esolve.compute();
-  //printf("Eigensolve: %f\n", omp_get_wtime() - tmp);
-
-  // Retrieve results
-  if(esolve.info() != Spectra::SUCCESSFUL) {
-    throw std::runtime_error("Eigenvalue solve failed!");
-  }
-
-  VectorXd eigs(nevs);
-  MatrixXd evecsr = esolve.eigenvectors();
-  MatrixXd evecs(esolve.eigenvectors().rows(), nevs);
-
-  for(int i = 0; i < 6; i++) {
-    if(esolve.eigenvalues()(6 + nevs - i - 1) > 1e-6) {
-      std::cout << "Eigenvalue " << i << " is " << esolve.eigenvalues()(6 + nevs - i - 1) << " (should be near zero -- tolerance is 1e-6)" <<std::endl;
-      throw std::runtime_error("Less than six zero eigenvalues. Something has gone wrong");
-    }
-  }
-  
-  for(int i = 0; i < nevs; i++) {
-    eigs(i) = esolve.eigenvalues()(nevs - i - 1);
-    for(int j = 0; j < evecs.rows(); j++) {
-      evecs(j, i) = evecsr(j, nevs - i - 1);
-    }
-  }
-  //VectorXd eigs;
-  //MatrixXd evecs;
-  //eigSolve(K, 6, 6 + nevs - 1, eigs, evecs);
-  tmp = omp_get_wtime();
-
-  //std::cout << "its: " << esolve.num_iterations() << std::endl;
-  //std::cout << "ops: " << esolve.num_operations() << std::endl;
-
-  //std::cout << esolve.eigenvalues().transpose() << std::endl;
-
-  //std::cout << "====" << std::endl;
-  
-  //SelfAdjointEigenSolver<MatrixXd> es(K);
-
-  //for(int i = 0; i < 6 + nevs; i++)
-  //  std::cout << es.eigenvalues()(i) << std::endl;
-
-  int N = K.rows();
-
-  freqs.resize(nevs);
-
-  dfreqsdCij.resize(nevs, C.size());
-
-  std::vector< MatrixXd > dKdcij_evecs;
-
-  for(int ij = 0; ij < C.size(); ij++) {
-    dKdcij_evecs.push_back(dKdcijs[ij] * evecs);
-  }
-
-  for(int k = 0; k < nevs; k++) {
-    freqs(k) = sqrt(eigs(k) * 1.0e11) / (M_PI * 2000.0);
-    double dfde = 0.5e11 / (sqrt(eigs(k) * 1.0e11) * M_PI * 2000.0);
-
-    VectorXd evec = evecs.block(0, k, N, 1).eval();
-    RowVectorXd evecT = evec.transpose().eval();
-
-    for(int i = 0; i < C.size(); i++) {
-      dfreqsdCij(k, i) = (evecT * dKdcij_evecs[i].block(0, k, N, 1))(0, 0) * dfde;
-    }
-  }
-  
-  //if(DEBUG)
-  //printf("Output prep: %f\n", omp_get_wtime() - tmp);
+  M_ = M;
 }
 
 #endif
