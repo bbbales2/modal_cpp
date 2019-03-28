@@ -5,7 +5,7 @@
 // Stan function
 namespace rus_namespace {
 #include "polybasis.hpp"
-#include "mechanics.hpp"
+  //#include "mechanics.hpp"
 
   using namespace Eigen;
   using namespace stan::math;
@@ -372,10 +372,15 @@ namespace rus_namespace {
 
     int Ksize = lookup.size() / 21;
 
-    VectorXd lookup_;
-    Matrix<T2, Dynamic, 1> C_;
+    Matrix<T2, Dynamic, 1> C_(21);
 
-    flatten(Ksize, lookup, C, lookup_, C_);
+    int ij = 0;
+    for(int i = 0; i < 6; i++) {
+      for(int j = 0; j < i + 1; j++) {
+	C_(ij) = C(i, j);
+	ij++;
+      }
+    }
 
     Matrix<double, Dynamic, 1> freqs(N, 1);
     MatrixXd dfreqsdCij(N, C_.size());
@@ -383,7 +388,7 @@ namespace rus_namespace {
     //double tmp = omp_get_wtime();
     // This is the big custom function
     mechanics(value_of(C_), // Params
-              lookup_, N, // Ref data
+              lookup, N, // Ref data
               freqs, // Output
               dfreqsdCij); // Gradients
 
