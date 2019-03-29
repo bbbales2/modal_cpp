@@ -22,12 +22,11 @@ static double bp_[] = { 0.1333333333333333, 0.06666666666666666, -0.033333333333
                         0.33333333333333333, -2.66666666666666666, 2.33333333333333333 };
 
 double inner(double X, double Y, int i0, int i1, int j0, int j1) {
-  double ret = 0.0;
-
-  if (std::min(i0, std::min(i1, std::min(j0, j1))) >= 0) {
-    ret = (std::pow(X, i0 + i1 + 1) / (i0 + i1 + 1)) *
-      (std::pow(Y, j0 + j1 + 1) / (j0 + j1 + 1));
-  }
+  if(i0 < 0 | i1 < 0 | j0 < 0 | j1 < 0 | (i0 + i1) % 2 > 0 | (j0 + j1) % 2 > 0)
+    return 0.0;
+  
+  double ret = (2 * std::pow(0.5 * X, i0 + i1 + 1) / (i0 + i1 + 1)) *
+          (2 * std::pow(0.5 * Y, j0 + j1 + 1) / (j0 + j1 + 1));
 
   return ret;
 }
@@ -154,33 +153,45 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
   for(int i = 0; i < bp.size(); i++)
     bp(i) = bp_[i];
 
+  std::vector<std::array<int, 3> > ijsums;
+  for(int i = 0; i <= IN; i++) {
+    for(int j = 0; j <= JN; j++) {
+      if((i + j) <= std::max(IN, JN)) {
+        ijsums.push_back({ i, j, i + j });
+      }
+    }
+  }
+  
+  std::sort(ijsums.begin(), ijsums.end(),
+            [](const std::array<int, 3>& a, const std::array<int, 3>& b) { return a[2] > b[2]; } );
+  
   std::vector<std::array<int, 3> > ntoijk;
   std::vector<int> ntom;
   std::vector<int> nlength;
   std::vector<int> mton;
   int n = 0;
   int m = 0;
-  for(int i = 0; i <= IN; i++) {
-    for(int j = 0; j <= JN; j++) {
-      for(int k = 0; k < Z.size(); k++) {
-        if((i + j) <= std::max(IN, JN)) {
-          ntoijk.push_back({ i, j, k });
-          //std::cout << i << ", " << j << ", " << k << std::endl;
-          ntom.push_back(m);
-          if(k < Z.size() - 1) {
-            nlength.push_back(2);
-          } else {
-            nlength.push_back(1);
-          }
-
-          for(int l = 0; l < nlength.back(); l++) {
-            mton.push_back(n);
-          }
-
-          m = m + nlength.back();
-          n = n + 1;
-        }
+  
+  for(int ij = 0; ij < ijsums.size(); ij++) {
+    for(int k = 0; k < Z.size(); k++) {
+      int i = ijsums[ij][0];
+      int j = ijsums[ij][1];
+      
+      ntoijk.push_back({ i, j, k });
+      //std::cout << i << ", " << j << ", " << k << std::endl;
+      ntom.push_back(m);
+      if(k < Z.size() - 1) {
+	nlength.push_back(2);
+      } else {
+	nlength.push_back(1);
       }
+      
+      for(int l = 0; l < nlength.back(); l++) {
+	mton.push_back(n);
+      }
+      
+      m = m + nlength.back();
+      n = n + 1;
     }
   }
 
@@ -327,6 +338,26 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
       }
     }
   }
+
+  /*Eigen::LDLT<Eigen::MatrixXd> Wc = W.ldlt();
+
+  Eigen::VectorXd dKhatdcij = Eigen::VectorXd::Zero(3 * M * 3 * M * 36 * 2); // 3 * M x 3 * M x 36 x 2
+  for(int ii = 0; ii < 2; ii++) {
+    int ij = 0;
+    for(int p = 0; p < 6; p++) {
+      for(int q = 0; q < 6; q++) {
+        Eigen::Map<Eigen::MatrixXd> dKtmp(&dKdcij(dKdcij_idx(0, 0, p, q, ii)), 3 * M, 3 * M);
+        Eigen::Map<Eigen::MatrixXd> dKhattmp(&dKhatdcij(3 * M * 3 * M * (p + q * 6 + 36 * ii)), 3 * M, 3 * M);
+
+	Eigen::MatrixXd PdKtmpP = Wc.transpositionsP() * (Wc.transpositionsP() * dKtmp.transpose()).transpose();
+	Eigen::MatrixXd LPdKtmpPL = Wc.matrixL().solve(Wc.matrixL().solve(PdKtmpP.transpose()).transpose());
+	Eigen::VectorXd D_inv = Wc.vectorD().array().inverse().sqrt();
+	
+	dKhattmp = D_inv.asDiagonal() * LPdKtmpPL * D_inv.asDiagonal();
+        ij += 1;
+      }
+    }
+    }*/
 
   return dKhatdcij;
 }
