@@ -338,6 +338,15 @@ namespace rus_namespace {
       }
     }
   }
+  template<typename T1, typename T2>
+  inline Matrix<typename boost::math::tools::promote_args<T1, T2>::type, Dynamic, 1>
+  mech_rus(const int& P,
+	   const int& N,
+           const Matrix<T1, Dynamic, 1>& lookup, // Constant data
+           const Matrix<T2, Dynamic, Dynamic>& C, // Parameters
+           std::ostream *stream) {
+    throw std::runtime_error("You're using an old model file. mech_rus doesn't take a 'P' argument anymore");
+  }
 
   // Compute the resonance frequencies given the parameters
   //
