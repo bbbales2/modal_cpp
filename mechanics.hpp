@@ -91,7 +91,7 @@ void mechanics(const VectorXd& C, //Changing parameters
                const VectorXd& lookup, int nevs, // Constants
                VectorXd& freqs,  // Output
                Matrix<double, Dynamic, Dynamic>& dfreqsdCij) { // Derivatives
-  double tmp = omp_get_wtime();
+  //double tmp = omp_get_wtime();
 
   int L = 1;
 
