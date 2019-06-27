@@ -132,8 +132,8 @@ void mechanics(const VectorXd& C, //Changing parameters
   MatrixXd evecs(esolve.eigenvectors().rows(), nevs);
 
   for(int i = 0; i < 6; i++) {
-    if(esolve.eigenvalues()(6 + nevs - i - 1) > 1e-6) {
-      std::cout << "Eigenvalue " << i << " is " << esolve.eigenvalues()(6 + nevs - i - 1) << " (should be near zero -- tolerance is 1e-6)" <<std::endl;
+    if(esolve.eigenvalues()(6 + nevs - i - 1) > 1e-2) {
+      std::cout << "Eigenvalue " << i << " is " << esolve.eigenvalues()(6 + nevs - i - 1) << " (should be near zero -- tolerance is 1e-2)" <<std::endl;
       throw std::runtime_error("Less than six zero eigenvalues. Something has gone wrong");
     }
   }
