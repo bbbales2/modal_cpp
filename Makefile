@@ -1,5 +1,5 @@
-CPPFLAGS=-Ispectra/include/Spectra -I../../stan/lib/stan_math/lib/boost_1.66.0 -I../../stan/lib/stan_math/lib/eigen_3.3.3/ -I../../stan/lib/stan_math/ -I../../stan/lib/stan_math/lib/sundials_3.1.0/include/ --std=c++1y -g -O3 -msse
-LFLAGS=-llapack
+CPPFLAGS=-Ispectra/include/Spectra -I../../stan/lib/stan_math/lib/tbb_2019_U8/include -I../../src -I../../stan/src -I../../lib/rapidjson_1.1.0/ -I../../stan/lib/stan_math/ -I../../stan/lib/stan_math/lib/eigen_3.3.3 -I../../stan/lib/stan_math/lib/boost_1.72.0 -I../../stan/lib/stan_math/lib/sundials_5.1.0/include --std=c++1y -g -O3 -msse -pthread
+LFLAGS=-llapack -Wl,-L,"/home/bbales2/cmdstan-rus/stan/lib/stan_math/lib/tbb" -Wl,-rpath,"/home/bbales2/cmdstan-rus/stan/lib/stan_math/lib/tbb" -pthread ../../stan/lib/stan_math/lib/tbb/libtbb.so.2
 DEPS=util.hpp mechanics.hpp stan_mech.hpp polybasis.hpp
 SOURCES=stan_test.cpp stan_test_2.cpp bilayer_test.cpp stan_test_r.cpp cu2qu.cpp
 CC=g++

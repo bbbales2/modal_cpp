@@ -265,14 +265,14 @@ namespace rus_namespace {
     
     Matrix<var, Dynamic, 1> retval(N);
 
-    vari** params = ChainableStack::instance().memalloc_.alloc_array<vari *>(C.size());
+    vari** params = ChainableStack::instance_->memalloc_.alloc_array<vari *>(C.size());
 
     for(int i = 0; i < C.size(); i++) {
       params[i] = C(i).vi_;
     }
 
     for(int i = 0; i < N; i++) {
-      double* gradients = ChainableStack::instance().memalloc_.alloc_array<double>(C.size());
+      double* gradients = ChainableStack::instance_->memalloc_.alloc_array<double>(C.size());
 
       for(int j = 0; j < C.size(); j++)
         gradients[j] = dfreqsdCij(i, j);

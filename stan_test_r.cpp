@@ -66,7 +66,7 @@ int main() {
 
   //std::cout << C << std::endl << std::endl;
   
-  auto v1 = rus_namespace::mech_rus(P, N, lookup, C, NULL);
+  auto v1 = rus_namespace::mech_rus(N, lookup, C, NULL);
 
   VectorXd ref(N);
 
@@ -82,7 +82,7 @@ int main() {
   bool failed = false;
 
   for(int i = 0; i < N; i++) {
-    if(abs(v1(i) - ref(i)) / ref(i) > tol) {
+    if(std::abs(value_of(v1(i)) - ref(i)) / ref(i) > tol) {
       failed = true;
       break;
     }
@@ -159,7 +159,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((c11.adj() - refc11(i)) / c11.adj()) > tol) {
+    if(std::abs((c11.adj() - refc11(i)) / c11.adj()) > tol) {
       failed = true;
       break;
     }
@@ -190,7 +190,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((w.adj() - refw(i)) / w.adj()) > tol) {
+    if(std::abs((w.adj() - refw(i)) / w.adj()) > tol) {
       failed = true;
       break;
     }
@@ -221,7 +221,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((x.adj() - refx(i)) / x.adj()) > tol) {
+    if(std::abs((x.adj() - refx(i)) / x.adj()) > tol) {
       failed = true;
       break;
     }
@@ -252,7 +252,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((y.adj() - refy(i)) / y.adj()) > tol) {
+    if(std::abs((y.adj() - refy(i)) / y.adj()) > tol) {
       failed = true;
       break;
     }
@@ -283,7 +283,7 @@ int main() {
     
     v1(i).grad();
 
-    if(abs((z.adj() - refz(i)) / z.adj()) > tol) {
+    if(std::abs((z.adj() - refz(i)) / z.adj()) > tol) {
       failed = true;
       break;
     }
