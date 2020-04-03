@@ -324,8 +324,8 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
     }
   }
 
-  //Eigen::LLT<Eigen::MatrixXd> Wc = W.llt();
-  Eigen::LDLT<Eigen::MatrixXd> Wc = W.ldlt();
+  Eigen::LLT<Eigen::MatrixXd> Wc = W.llt();
+  //Eigen::LDLT<Eigen::MatrixXd> Wc = W.ldlt();
 
   Eigen::VectorXd dKhatdcij = Eigen::VectorXd::Zero(3 * M * 3 * M * 36 * 2); // 3 * M x 3 * M x 36 x 2
   for(int ii = 0; ii < 2; ii++) {
@@ -335,14 +335,14 @@ Eigen::VectorXd buildBilayerBasis(const int& IN, const int& JN, int layer_index,
         Eigen::Map<Eigen::MatrixXd> dKtmp(&dKdcij(dKdcij_idx(0, 0, p, q, ii)), 3 * M, 3 * M);
         Eigen::Map<Eigen::MatrixXd> dKhattmp(&dKhatdcij(3 * M * 3 * M * (p + q * 6 + 36 * ii)), 3 * M, 3 * M);
 
-	Eigen::MatrixXd K1 = (Wc.transpositionsP() * dKtmp.transpose()).transpose();
+	/*Eigen::MatrixXd K1 = (Wc.transpositionsP() * dKtmp.transpose()).transpose();
 	Eigen::MatrixXd K2 = Wc.matrixL().solve(dKtmp.transpose()).transpose();
 	Eigen::MatrixXd K3 = K2 * Wc.vectorD().array().sqrt().inverse().matrix().asDiagonal();
 
 	Eigen::MatrixXd K4 = Wc.transpositionsP() * K3;
 	Eigen::MatrixXd K5 = Wc.matrixL().solve(K4);
-	dKhattmp = Wc.vectorD().array().sqrt().inverse().matrix().asDiagonal() * K2;
-	//dKhattmp = Wc.matrixL().solve(Wc.matrixL().solve(dKtmp.transpose()).transpose());
+	dKhattmp = Wc.vectorD().array().sqrt().inverse().matrix().asDiagonal() * K2;*/
+	dKhattmp = Wc.matrixL().solve(Wc.matrixL().solve(dKtmp.transpose()).transpose());
         ij += 1;
       }
     }
