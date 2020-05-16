@@ -17,7 +17,7 @@ namespace rus_namespace {
   }
 
 template <typename T3__, typename T4__, typename T5__, typename T6__, typename T7__>
-Eigen::Matrix<typename boost::math::tools::promote_args<T3__, T4__, T5__, T6__, T7__>::type, Eigen::Dynamic,1>
+Eigen::Matrix<typename boost::math::tools::promote_args<T3__, T4__, T5__, T6__, typename boost::math::tools::promote_args<T7__>::type>::type, Eigen::Dynamic, 1>
 bilayer_init(const int& IN,
 	     const int& JN,
 	     const int& layer_index,
